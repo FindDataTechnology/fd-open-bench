@@ -1,8 +1,6 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
-import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Agents from './pages/Agents'
 import AgentDetail from './pages/AgentDetail'
@@ -23,106 +21,25 @@ const queryClient = new QueryClient({
   },
 })
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth()
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
-  }
-
-  return <Layout>{children}</Layout>
-}
-
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Router>
+      <Router>
+        <Layout>
           <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/agents"
-              element={
-                <ProtectedRoute>
-                  <Agents />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/agents/:id"
-              element={
-                <ProtectedRoute>
-                  <AgentDetail />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/datasets"
-              element={
-                <ProtectedRoute>
-                  <Datasets />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/datasets/:id"
-              element={
-                <ProtectedRoute>
-                  <DatasetDetail />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/evaluations"
-              element={
-                <ProtectedRoute>
-                  <Evaluations />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/evaluations/:id"
-              element={
-                <ProtectedRoute>
-                  <EvaluationDetail />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/evaluators"
-              element={
-                <ProtectedRoute>
-                  <Evaluators />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/cost-analyzer"
-              element={
-                <ProtectedRoute>
-                  <CostAnalyzer />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/agents" element={<Agents />} />
+            <Route path="/agents/:id" element={<AgentDetail />} />
+            <Route path="/datasets" element={<Datasets />} />
+            <Route path="/datasets/:id" element={<DatasetDetail />} />
+            <Route path="/evaluations" element={<Evaluations />} />
+            <Route path="/evaluations/:id" element={<EvaluationDetail />} />
+            <Route path="/evaluators" element={<Evaluators />} />
+            <Route path="/cost-analyzer" element={<CostAnalyzer />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
-        </Router>
-      </AuthProvider>
+        </Layout>
+      </Router>
     </QueryClientProvider>
   )
 }

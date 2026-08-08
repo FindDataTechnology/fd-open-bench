@@ -1,3 +1,8 @@
+> **⏸️ 本 change 暂停(2026-08-08)**:`refactor-benchmark-core` 正在重构页面信息架构
+> (Dashboard/CostAnalyzer/Evaluators/Login 页将被删除,新增 Leaderboard/Benchmarks 页)。
+> 本 change 已完成的测试基础设施(Playwright 配置、fixtures、page objects)保留;
+> 剩余测试任务将在 refactor-benchmark-core 阶段 3 页面定型后重新瞄准,相关测试用例需按新 IA 重写。
+
 ## 1. Test Infrastructure Setup
 
 - [x] 1.1 Install Playwright and dependencies

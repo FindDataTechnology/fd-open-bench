@@ -1,8 +1,6 @@
-import React, { useState } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { useState } from 'react'
 
 export default function Settings() {
-  const { user } = useAuth()
   const [activeTab, setActiveTab] = useState('profile')
 
   return (
@@ -38,44 +36,21 @@ export default function Settings() {
             <div className="space-y-6">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                  Profile Settings
+                  Profile
                 </h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Name
-                    </label>
-                    <input
-                      type="text"
-                      defaultValue={user?.name || ''}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      defaultValue={user?.email || ''}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Role
-                    </label>
-                    <input
-                      type="text"
-                      value={user?.role || 'viewer'}
-                      disabled
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400"
-                    />
-                  </div>
-                  <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                    Save Changes
-                  </button>
-                </div>
+                <p className="text-gray-600 dark:text-gray-300">
+                  fd-open-bench runs as a local internal tool — there are no user
+                  accounts. To restrict API access, set{' '}
+                  <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-900 rounded">
+                    FD_BENCH_API_TOKEN
+                  </code>{' '}
+                  on the backend and store the same value in this browser's
+                  localStorage under the key{' '}
+                  <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-900 rounded">
+                    fd_bench_api_token
+                  </code>
+                  .
+                </p>
               </div>
             </div>
           )}

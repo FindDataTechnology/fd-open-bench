@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import api from '../services/api'
 import {
@@ -122,7 +122,7 @@ export default function CostAnalyzer() {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {costBreakdown.breakdown?.map((entry, index) => (
+                    {costBreakdown.breakdown?.map((_entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>

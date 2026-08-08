@@ -2,16 +2,16 @@
 
 ## 阶段 0 — 止血与地基
 
-- [ ] 0.1 `git init`,添加 `.gitignore`(node_modules、__pycache__、*.db、.env、venv),提交现状为基线 commit
-- [ ] 0.2 删除死代码 `app/api/agents.py`、`datasets.py`、`goldens.py`、`evaluations.py`、`evaluators.py`,并将 `app/api/__init__.py` 清空为纯包标记(不再有 import 副作用)
-- [ ] 0.3 验证删除后应用正常启动、全部路由可达(对照 `app/api/routes/` 注册的 5 个 router)
-- [ ] 0.4 移除 Celery/Redis: 删除 `app/tasks.py`、`pyproject.toml` 中 celery/redis 依赖、docker-compose 中 celery/redis 服务
-- [ ] 0.5 将 Celery 调用的评测入口改为 FastAPI BackgroundTasks / asyncio 后台执行,保持 run 状态机(pending→running→completed/failed)不变
-- [ ] 0.6 SQLite 开启 WAL 模式(连接初始化处设置 `PRAGMA journal_mode=WAL`)
-- [ ] 0.7 移除多用户 auth: 删除前端 Login 页、AuthContext、ProtectedRoute;后端 auth 路由改为可选单 token 校验(`FD_BENCH_API_TOKEN`,空则放行)
-- [ ] 0.8 重写 README: 架构图改为 SQLite + 单进程;Quick Start 与实际启动方式(`start.sh`)一致;标注 `fd-bench` CLI/MCP 用法不变
-- [ ] 0.9 在 `add-e2e-tests/tasks.md` 顶部标注: 本 change 暂停,待 refactor-benchmark-core 阶段 3 页面定型后重新瞄准
-- [ ] 0.10 提交阶段 0,验证: 后端启动、前端构建、MCP `raw_api GET /api/v1/agents` 可用
+- [x] 0.1 `git init`,添加 `.gitignore`(node_modules、__pycache__、*.db、.env、venv),提交现状为基线 commit
+- [x] 0.2 删除死代码 `app/api/agents.py`、`datasets.py`、`goldens.py`、`evaluations.py`、`evaluators.py`,并将 `app/api/__init__.py` 清空为纯包标记(不再有 import 副作用)
+- [x] 0.3 验证删除后应用正常启动、全部路由可达(对照 `app/api/routes/` 注册的 5 个 router)
+- [x] 0.4 移除 Celery/Redis: 删除 `app/tasks.py`、`pyproject.toml` 中 celery/redis 依赖、docker-compose 中 celery/redis 服务
+- [x] 0.5 将 Celery 调用的评测入口改为 FastAPI BackgroundTasks / asyncio 后台执行,保持 run 状态机(pending→running→completed/failed)不变
+- [x] 0.6 SQLite 开启 WAL 模式(连接初始化处设置 `PRAGMA journal_mode=WAL`)
+- [x] 0.7 移除多用户 auth: 删除前端 Login 页、AuthContext、ProtectedRoute;后端 auth 路由改为可选单 token 校验(`FD_BENCH_API_TOKEN`,空则放行)
+- [x] 0.8 重写 README: 架构图改为 SQLite + 单进程;Quick Start 与实际启动方式(`start.sh`)一致;标注 `fd-bench` CLI/MCP 用法不变
+- [x] 0.9 在 `add-e2e-tests/tasks.md` 顶部标注: 本 change 暂停,待 refactor-benchmark-core 阶段 3 页面定型后重新瞄准
+- [x] 0.10 提交阶段 0,验证: 后端启动、前端构建、MCP `raw_api GET /api/v1/agents` 可用
 
 ## 阶段 1 — 数据模型
 

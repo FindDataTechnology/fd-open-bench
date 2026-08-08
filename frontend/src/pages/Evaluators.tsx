@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../services/api'
 
@@ -209,7 +209,7 @@ function TestEvaluatorModal({ evaluator, onClose }) {
       })
       setResult(response.data)
     } catch (error) {
-      alert('Test failed: ' + error.message)
+      alert('Test failed: ' + (error as Error).message)
     } finally {
       setLoading(false)
     }

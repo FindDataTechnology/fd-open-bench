@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 from app.core.config import get_settings
@@ -16,6 +16,14 @@ if database_url.startswith("sqlite"):
         database_url,
         connect_args={"check_same_thread": False}
     )
+
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, connection_record):
+        """Enable WAL mode for better concurrent read/write behavior."""
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 else:
     # PostgreSQL configuration
     engine = create_engine(

@@ -16,23 +16,11 @@ else
     exit 0
 fi
 
-# Start PostgreSQL in background (if available)
-if ! pg_isready -h localhost -p 5432 &>/dev/null; then
-    echo "PostgreSQL is not running. Please start it first."
-    exit 1
-fi
-
-# Start Redis in background (if available)
-if ! redis-cli -h localhost -p 6379 ping &>/dev/null; then
-    echo "Redis is not running. Please start it first."
-    exit 1
-fi
-
 # Install Python dependencies
 echo "Installing Python dependencies..."
-pip install -e ".[dev]" || pip install -r requirements.txt
+pip install -e ".[dev]"
 
-# Run database migrations
+# Run database migrations (SQLite file is created automatically)
 echo "Running database migrations..."
 alembic upgrade head
 
@@ -43,16 +31,6 @@ export VITE_API_URL="${API_URL:-http://localhost:8999}"
 echo "Starting FastAPI backend on http://localhost:${FASTAPI_PORT:-8999}..."
 uvicorn app.main:app --reload --host ${FASTAPI_HOST:-0.0.0.0} --port ${FASTAPI_PORT:-8999} &
 BACKEND_PID=$!
-
-# Start Celery worker in background
-echo "Starting Celery worker..."
-celery -A app.celery_worker worker --loglevel=info &
-WORKER_PID=$!
-
-# Start Celery beat in background
-echo "Starting Celery Beat..."
-celery -A app.celery_worker beat --loglevel=info &
-BEAT_PID=$!
 
 # Start frontend
 echo "Starting frontend on http://localhost:${FRONTEND_PORT:-3118}..."
@@ -72,4 +50,4 @@ echo "Press Ctrl+C to stop all services"
 echo "=========================================="
 
 # Wait for processes
-wait $BACKEND_PID $WORKER_PID $BEAT_PID $FRONTEND_PID
+wait $BACKEND_PID $FRONTEND_PID

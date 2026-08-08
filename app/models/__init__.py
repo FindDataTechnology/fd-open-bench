@@ -5,7 +5,6 @@ from .evaluation_run import EvaluationRun, EvaluationRunStatus
 from .evaluation_result import EvaluationResult, EvaluationResultStatus
 from .business_model import BusinessModel
 from .evaluator_config import EvaluatorConfig
-from .user import User
 from .trace import Trace, Span, TokenUsage, TraceDB
 
 __all__ = [
@@ -18,7 +17,6 @@ __all__ = [
     "EvaluationResultStatus",
     "BusinessModel",
     "EvaluatorConfig",
-    "User",
     "Trace",
     "Span",
     "TokenUsage",

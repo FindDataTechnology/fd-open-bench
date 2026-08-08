@@ -1,6 +1,5 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -9,7 +8,6 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const location = useLocation()
-  const { user, logout } = useAuth()
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: '📊' },
@@ -85,36 +83,9 @@ export default function Layout({ children }: LayoutProps) {
                 </button>
               </div>
               <div className="flex items-center">
-                <div className="flex items-center ml-3">
-                  <div className="text-right mr-4">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {user?.name || 'User'}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {user?.role || 'viewer'}
-                    </p>
-                  </div>
-                  <button
-                    onClick={logout}
-                    data-testid="logout-button"
-                    className="p-2 text-gray-600 rounded-lg hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-                  >
-                    <span className="sr-only">Logout</span>
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                      />
-                    </svg>
-                  </button>
-                </div>
+                <span className="text-xs text-gray-400 dark:text-gray-500 mr-2">
+                  local · internal tool
+                </span>
               </div>
             </div>
           </div>

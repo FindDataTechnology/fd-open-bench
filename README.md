@@ -1,35 +1,46 @@
 # FD Open Bench
 
-An **Agent Performance Evaluation Platform** built with DeepEval integration, providing comprehensive evaluation of AI agents with runtime tracing, custom evaluators, business value modeling, and a web UI for analysis.
+An **Agent Benchmark Platform** for internal use: compare AI agents on the same
+benchmark, and judge them by **technical quality AND business value** — cost per
+successful task, ROI, human-cost replacement, and time value.
 
 ## Features
 
-- **DeepEval Integration**: First-class support for DeepEval metrics (TaskCompletion, StepEfficiency, PlanQuality, etc.)
-- **Custom Evaluators**: Three-tier evaluator framework (validators, LLM judges, domain executors)
-- **Business Value Modeling**: Track costs (tokens, time) vs. business value with ROI calculation
-- **Runtime Tracing**: Full execution traces with token usage, timing, and span hierarchy
-- **Batch Evaluation**: Queue-based parallel evaluation with progress tracking
-- **Web Dashboard**: Real-time monitoring, trace visualization, cost analysis, A/B testing
+- **Benchmarks**: a dataset + a metric suite + a business model (`value_formula`,
+  `time_value_rate`) — one unit of comparison
+- **Batch evaluation**: run N agents against the same benchmark in one batch,
+  with per-agent progress tracking
+- **Leaderboard**: same-benchmark comparison of agents, technical stats
+  (avg/stddev per metric) next to business metrics
+- **Business metrics**: cost per successful task, human replacement ratio,
+  time cost, custom value formulas (safe AST-evaluated, no `eval()`)
+- **Runtime tracing**: full execution traces with token usage, timing, spans
+- **DeepEval integration**: TaskCompletion, StepEfficiency, PlanQuality, etc.
+- **CLI & MCP**: drive everything from `fd-bench` or Claude Desktop
 
 ## Architecture
 
+Single process, single SQLite file — no Postgres, no Redis, no Celery:
+
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Web UI (React + TypeScript)              │
-│  Dashboard | Trace Explorer | Cost Analyzer | Config Builder│
-└──────────────────────────┬──────────────────────────────────┘
-                           │ WebSocket/REST
-┌──────────────────────────▼──────────────────────────────────┐
-│               FastAPI Backend                               │
-│  Agents | Datasets | Evaluations | Results | Evaluators    │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-         ┌─────────────────┼─────────────────┐
-         ▼                 ▼                 ▼
-┌─────────────────┐ ┌─────────────┐ ┌──────────────────┐
-│   PostgreSQL    │ │    Redis    │ │   Celery Workers │
-│   Database      │ │   Queue     │ │   (Evaluation)   │
-└─────────────────┘ └─────────────┘ └──────────────────┘
+┌──────────────────────────────────────────────┐
+│        Web UI (React + TypeScript)           │
+│   Leaderboard | Benchmarks | Agents | Runs   │
+└──────────────────────┬───────────────────────┘
+                       │ REST /api/v1
+┌──────────────────────▼───────────────────────┐
+│            FastAPI backend (8999)            │
+│   agents | datasets | evaluations | batches  │
+│   evaluators | benchmarks (leaderboard)      │
+│   background eval execution via asyncio      │
+└──────────────────────┬───────────────────────┘
+                       │ SQLAlchemy
+              ┌────────▼────────┐
+              │  SQLite (WAL)   │
+              │ fd_open_bench.db│
+              └─────────────────┘
+
+  fd-bench CLI / Claude Desktop ──MCP(stdio)──▶ mcp_server ──HTTP──▶ backend
 ```
 
 ## Quick Start
@@ -37,113 +48,69 @@ An **Agent Performance Evaluation Platform** built with DeepEval integration, pr
 ### Prerequisites
 
 - Python 3.11+
-- PostgreSQL 16+
-- Redis 7+
-- Docker & Docker Compose (optional, for full stack)
+- Node.js 18+ (frontend dev server)
 
-### Installation (Development)
+### Development
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/fd-open-bench.git
-cd fd-open-bench
+git clone <repo> && cd fd-open-bench
+python -m venv venv && source venv/bin/activate
 
-# Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -e ".[dev]"
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your database credentials and API keys
-
-# Run database migrations
-alembic upgrade head
-
-# Start the backend server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+./start.sh   # installs deps, runs migrations, starts backend :8999 + frontend :3118
 ```
 
-### Using Docker Compose
+`start.sh` creates `.env` from `.env.example` on first run — edit it to add your
+LLM API keys, then re-run. SQLite database file is created automatically
+(`fd_open_bench.db`, WAL mode).
+
+Stop everything with `./stop.sh` (or Ctrl+C in the `start.sh` terminal).
+
+- Backend API: http://localhost:8999 — Swagger docs at `/docs`
+- Frontend: http://localhost:3118
+
+### Docker (optional)
 
 ```bash
-# Start all services (backend, frontend, db, redis, celery)
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop all services
+docker-compose up -d    # backend :8999 (SQLite in fd_data volume) + frontend :3000
 docker-compose down
-```
-
-## Project Structure
-
-```
-fd-open-bench/
-├── alembic/                 # Database migrations
-│   ├── versions/
-│   └── env.py
-├── app/
-│   ├── api/                 # REST API endpoints
-│   ├── core/                # Configuration, logging, security
-│   ├── models/              # SQLAlchemy data models
-│   ├── repositories/        # Data access layer
-│   ├── evaluators/          # Evaluator framework (validators, judges, executors)
-│   ├── services/            # Business logic services
-│   ├── tasks/               # Celery tasks for batch processing
-│   └── main.py              # Application entry point
-├── frontend/                # React + TypeScript frontend
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── services/
-│   │   └── App.tsx
-│   ├── package.json
-│   └── vite.config.ts
-├── tests/                   # Test suite
-│   ├── unit/
-│   ├── integration/
-│   └── e2e/
-├── pyproject.toml           # Python dependencies
-├── docker-compose.yml       # Container orchestration
-└── README.md
 ```
 
 ## Core Concepts
 
-### Agent
+### Benchmark (题 + 尺 + 生意)
 
-An agent configuration including its adapter type (OpenAI, LangChain, custom), model settings, tools, and pricing configuration.
-
-### Dataset
-
-A collection of test cases (Goldens) used for batch evaluation.
+The unit of comparison: a **dataset** (the questions), a **metric suite** (the
+ruler), and a **business model** (value formula + time value rate). Agents are
+only ever compared within the same benchmark.
 
 ### Golden
 
-A single test case containing:
-- `input`: What to send to the agent
-- `expected_output`: Optional ground truth
-- `expected_tools`: Optional list of expected tool calls
-- `business_value`: Expected value if task succeeds
+A single test case: `input`, optional `expected_output` / `expected_tools`, plus
+optional business fields — `business_value` ($ if the task succeeds),
+`human_cost` ($ for a human to do it), `human_minutes`.
 
-### Evaluation Run
+### Batch
 
-A batch evaluation job that runs an agent against a dataset with configured evaluators.
+One `POST /api/v1/batches` runs several agents against one benchmark; each agent
+gets its own evaluation run sharing a `batch_id`. Compare within a batch or
+across all runs of a benchmark.
+
+### Leaderboard
+
+`GET /api/v1/benchmarks/{id}/leaderboard` — per-agent technical stats and
+business metrics (cost per success, human replacement, time cost, ROI), sorted
+by cost per successful task.
 
 ### Evaluator
 
-A check that validates agent outputs:
-- **Validators**: Fast, deterministic (regex, JSON schema, keywords)
-- **LLM Judges**: Flexible, expensive (DeepEval metrics, custom prompts)
-- **Executors**: Ground truth validation (SQL, API, code execution)
+- **Validators**: fast, deterministic (regex, JSON schema, keywords)
+- **LLM judges**: DeepEval metrics, custom prompts
+- **Executors**: ground-truth validation (SQL, API, code execution)
 
 ## CLI & MCP
 
-`fd-bench` is a chat-first CLI that drives the platform through an MCP server — no browser needed. The same MCP server also powers Claude Desktop and (later) a web sidebar.
+`fd-bench` drives the platform through an MCP server — no browser needed.
+Usage is unchanged by the refactor.
 
 ### Setup
 
@@ -174,8 +141,6 @@ Chat defaults to `claude-opus-4-8`; override with `FD_BENCH_MODEL=claude-sonnet-
 
 ### Use with Claude Desktop
 
-Point Claude Desktop at the same binary — no separate server process to run:
-
 ```jsonc
 // Claude Desktop -> Settings -> Developer -> MCP Servers
 {
@@ -185,21 +150,38 @@ Point Claude Desktop at the same binary — no separate server process to run:
 }
 ```
 
-The domain tools (`run_evaluation`, `get_evaluation_status`, `analyze_weaknesses`, `compare_agents`, `find_best_performer`, `export_report`) and the unstable `raw_api` escape hatch are then available in Claude Desktop. Every `raw_api` call is logged — that log is the backlog of future domain tools (promote repeated patterns into dedicated tools).
+Domain tools (`run_evaluation`, `get_evaluation_status`, `analyze_weaknesses`,
+`compare_agents`, `find_best_performer`, `export_report`) plus the unstable
+`raw_api` escape hatch. Every `raw_api` call is logged — repeated patterns get
+promoted into dedicated tools.
 
 ### Transports
 
 - `fd-bench mcp serve` — stdio (default; used by the CLI and Claude Desktop).
-- `fd-bench mcp serve --http [--port 8998]` or `MCP_HTTP=1` — streamable HTTP, for the future CopilotKit sidebar.
+- `fd-bench mcp serve --http [--port 8998]` or `MCP_HTTP=1` — streamable HTTP.
 
-> **Auth gate:** the HTTP transport is local-only for now. Before exposing it beyond localhost (e.g. for CopilotKit), add auth to the MCP server. CopilotKit itself is deferred — the existing web UI keeps working in the meantime.
+> **Auth:** local-only by default. Set `FD_BENCH_API_TOKEN` on the backend to
+> require `Authorization: Bearer <token>` on all API requests (empty = open).
+> Do not expose the HTTP transport beyond localhost without it.
 
-## API Documentation
+## Project Structure
 
-Interactive API docs are available at `/docs` when running the backend:
-
-```bash
-http://localhost:8000/docs
+```
+fd-open-bench/
+├── alembic/                 # Database migrations
+├── app/
+│   ├── api/routes/          # REST API endpoints
+│   ├── core/                # Config, logging, single-token auth guard
+│   ├── models/              # SQLAlchemy data models
+│   ├── evaluators/          # Evaluator framework
+│   ├── services/            # Business logic (incl. evaluation engine)
+│   └── main.py              # Application entry point
+├── cli/                     # fd-bench CLI
+├── mcp_server/              # MCP server (stdio/HTTP)
+├── frontend/                # React + TypeScript + Vite
+├── tests/                   # unit / integration / e2e
+├── start.sh / stop.sh       # dev environment scripts
+└── docker-compose.yml       # optional container deployment
 ```
 
 ## License
@@ -208,4 +190,4 @@ MIT License
 
 ---
 
-Built with ❤️ using FastAPI, React, DeepEval, and PostgreSQL.
+Built with FastAPI, React, DeepEval, and SQLite.

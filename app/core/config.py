@@ -20,23 +20,15 @@ class Settings(BaseSettings):
     frontend_port: int = 3118
     api_url: str = "http://localhost:8999"
 
-    # Database
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/fd_open_bench"
-
-    # Redis/Celery
-    redis_url: str = "redis://localhost:6379/0"
-    celery_broker_url: str = "redis://localhost:6379/0"
-    celery_result_backend: str = "redis://localhost:6379/0"
+    # Database (SQLite by default; Postgres still works via DATABASE_URL)
+    database_url: str = "sqlite:///./fd_open_bench.db"
 
     # Logging
     log_level: str = "INFO"
     log_format: str = "json"
 
-    # Authentication
-    secret_key: str = "your-super-secret-key-change-in-production"
-    jwt_expire_hours: int = 24
-    algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60 * 24  # 24 hours
+    # Optional single-token API guard (empty = open, local internal tool)
+    fd_bench_api_token: str = ""
 
     # LLM API Keys (optional)
     openai_api_key: str | None = None

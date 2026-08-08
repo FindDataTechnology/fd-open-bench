@@ -1,11 +1,12 @@
 """API routes package."""
 
-from fastapi import APIRouter
-from app.api.routes import agents, datasets, evaluations, evaluators, auth
+from fastapi import APIRouter, Depends
 
-api_router = APIRouter()
+from app.api.routes import agents, datasets, evaluations, evaluators
+from app.core.auth import verify_api_token
 
-api_router.include_router(auth.router)
+api_router = APIRouter(dependencies=[Depends(verify_api_token)])
+
 api_router.include_router(agents.router)
 api_router.include_router(datasets.router)
 api_router.include_router(evaluations.router)
