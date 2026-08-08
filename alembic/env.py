@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.database import Base
 from app.models.agent import Agent
+from app.models.benchmark import Benchmark
 from app.models.dataset import Dataset
 from app.models.golden import Golden
 from app.models.evaluation_run import EvaluationRun

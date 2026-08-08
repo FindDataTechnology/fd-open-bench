@@ -40,6 +40,8 @@ class GoldenCreate(BaseModel):
     expected_output: str = None
     expected_tools: List[Dict[str, Any]] = None
     business_value: float = None
+    human_cost: float = None
+    human_minutes: int = None
     metadata: Dict[str, Any] = {}
 
 
@@ -48,9 +50,11 @@ class GoldenResponse(BaseModel):
     id: str
     dataset_id: str
     input: str
-    expected_output: str
-    expected_tools: List[Dict[str, Any]]
-    business_value: float
+    expected_output: str | None = None
+    expected_tools: List[Dict[str, Any]] | None = None
+    business_value: float | None = None
+    human_cost: float | None = None
+    human_minutes: int | None = None
     metadata: Dict[str, Any]
     created_at: str
 
@@ -210,6 +214,8 @@ async def create_golden(
         expected_output=golden_data.expected_output,
         expected_tools=golden_data.expected_tools,
         business_value=golden_data.business_value,
+        human_cost=golden_data.human_cost,
+        human_minutes=golden_data.human_minutes,
         metadata=golden_data.metadata
     )
 
@@ -233,7 +239,18 @@ async def bulk_create_goldens(
         )
 
     repo = GoldenRepository(db)
-    goldens = repo.bulk_create_from_dicts(dataset_id, [g.dict() for g in goldens_data])
+    goldens_dicts = []
+    for g in goldens_data:
+        goldens_dicts.append({
+            "input": g.input,
+            "expected_output": g.expected_output,
+            "expected_tools": g.expected_tools,
+            "business_value": g.business_value,
+            "human_cost": g.human_cost,
+            "human_minutes": g.human_minutes,
+            "metadata": g.metadata,
+        })
+    goldens = repo.bulk_create_from_dicts(dataset_id, goldens_dicts)
 
     return {
         'created': len(goldens),
@@ -275,6 +292,10 @@ async def import_goldens(
 
     # Create goldens
     repo = GoldenRepository(db)
+    # Ensure business_value/human_cost/human_minutes are in each golden dict
+    for g in goldens_data:
+        if 'metadata' not in g:
+            g['metadata'] = {}
     goldens = repo.bulk_create_from_dicts(dataset_id, goldens_data)
 
     return {
@@ -320,6 +341,8 @@ async def update_golden(
         expected_output=golden_data.expected_output,
         expected_tools=golden_data.expected_tools,
         business_value=golden_data.business_value,
+        human_cost=golden_data.human_cost,
+        human_minutes=golden_data.human_minutes,
         metadata=golden_data.metadata
     )
 

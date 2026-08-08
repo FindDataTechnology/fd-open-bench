@@ -1,5 +1,6 @@
 from typing import Any
 from decimal import Decimal
+from app.utils.expression import safe_eval, FormulaError
 
 
 class BusinessValueCalculator:
@@ -58,19 +59,25 @@ class BusinessValueCalculator:
         if not task_completed:
             return Decimal("0")
 
-        # If custom formula, evaluate it
+        # If custom formula, evaluate it with safe evaluator
         if self.value_formula:
             try:
-                # Safe evaluation with limited scope
                 context = {
                     "success_score": success_score,
-                    "deal_value": golden_metadata.get("deal_value", 100),
-                    "task_value": golden_metadata.get("task_value", 50),
+                    "business_value": golden_metadata.get("business_value", 100),
+                    "human_cost": golden_metadata.get("human_cost", 50),
+                    "latency_s": golden_metadata.get("latency_s", 10),
+                    "input_tokens": golden_metadata.get("input_tokens", 1000),
+                    "output_tokens": golden_metadata.get("output_tokens", 200),
                 }
-                result = eval(self.value_formula, {"__builtins__": {}}, context)
+                result = safe_eval(self.value_formula, context)
                 return Decimal(str(result))
-            except Exception:
-                pass
+            except FormulaError as e:
+                # Fallback to default formula on error
+                # Log the error (in production, this would use proper logging)
+                print(f"Formula evaluation failed: {e}, using fallback")
+                base_value = Decimal(str(golden_metadata.get("business_value", 100)))
+                return base_value * Decimal(str(success_score))
 
         # Default: use business_value from golden or default
         base_value = Decimal(str(golden_metadata.get("business_value", 100)))

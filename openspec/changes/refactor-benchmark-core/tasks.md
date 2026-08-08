@@ -15,26 +15,26 @@
 
 ## 阶段 1 — 数据模型
 
-- [ ] 1.1 新增 `app/models/benchmark.py`: id/name/description/dataset_id/metric_suite(JSON)/value_formula/time_value_rate/时间戳
-- [ ] 1.2 Golden 模型新增列: `business_value`(Numeric)、`human_cost`(Numeric)、`human_minutes`(Integer),均可空
-- [ ] 1.3 EvaluationRun 模型新增列: `benchmark_id`(可空,FK)、`batch_id`(可空,索引)
-- [ ] 1.4 编写 alembic 迁移: benchmarks 建表;goldens 三列并从 `extra_metadata.business_value` 回填;evaluation_runs 两列
-- [ ] 1.5 实现安全表达式求值器 `app/utils/expression.py`: AST 白名单(变量/四则/比较/条件/min/max/abs/round),禁止属性访问与任意调用
-- [ ] 1.6 求值器单元测试: 合法公式正确求值;`__class__`、`import`、属性链等攻击载荷被拒绝;求值异常走回退
-- [ ] 1.7 Benchmark CRUD API: `POST/GET/PUT/DELETE /api/v1/benchmarks`,含 dataset 存在性校验
-- [ ] 1.8 Golden API 支持商业字段读写(创建/编辑/导入时接受 business_value/human_cost/human_minutes)
+- [x] 1.1 新增 `app/models/benchmark.py`: id/name/description/dataset_id/metric_suite(JSON)/value_formula/time_value_rate/时间戳
+- [x] 1.2 Golden 模型新增列: `business_value`(Numeric)、`human_cost`(Numeric)、`human_minutes`(Integer),均可空
+- [x] 1.3 EvaluationRun 模型新增列: `benchmark_id`(可空,FK)、`batch_id`(可空,索引)
+- [x] 1.4 编写 alembic 迁移: benchmarks 建表;goldens 三列并从 `extra_metadata.business_value` 回填;evaluation_runs 两列
+- [x] 1.5 实现安全表达式求值器 `app/utils/expression.py`: AST 白名单(变量/四则/比较/条件/min/max/abs/round),禁止属性访问与任意调用
+- [x] 1.6 求值器单元测试: 合法公式正确求值;`__class__`、`import`、属性链等攻击载荷被拒绝;求值异常走回退
+- [x] 1.7 Benchmark CRUD API: `POST/GET/PUT/DELETE /api/v1/benchmarks`,含 dataset 存在性校验
+- [x] 1.8 Golden API 支持商业字段读写(创建/编辑/导入时接受 business_value/human_cost/human_minutes)
 
 ## 阶段 2 — 引擎重造
 
-- [ ] 2.1 `BusinessValueCalculator` 移除 `eval()`,改用安全求值器;公式失败回退 `business_value * success_score` 并在 metadata 记录 `formula_error`
-- [ ] 2.2 新增每成功任务成本: `cost_per_success = total_cost / success_count`(success_count=0 时返回 null 而非除零)
-- [ ] 2.3 新增人工替代率: `human_replacement = cost_per_success / human_cost_per_task`(golden 缺 human_cost 的样本跳过并计数)
-- [ ] 2.4 新增时间成本: `time_cost = total_latency_s × benchmark.time_value_rate`,计入商业价值净额
-- [ ] 2.5 新增批量接口 `POST /api/v1/batches`: 入参 benchmark_id + agent_ids;为每 agent 创建带 batch_id/benchmark_id 的 run;后台并发执行(asyncio 信号量限流,默认 2)
-- [ ] 2.6 批量进度查询 `GET /api/v1/batches/{batch_id}`: 每 agent run 的状态/进度/已完成 golden 数
-- [ ] 2.7 新增 `app/services/comparison.py`: 输入 benchmark_id(可选 batch_id),聚合该 benchmark 下 runs,输出每 agent 的技术统计(avg/n/stddev/min/max per metric)+ 商业指标(2.2-2.4)
-- [ ] 2.8 `GET /api/v1/benchmarks/{id}/leaderboard`: 调用 comparison service,默认按 cost_per_success 升序;无数据 agent 列末尾并标注
-- [ ] 2.9 引擎层单元测试: 统计口径正确(手算小样本对照)、跨 benchmark 数据不混入、缺字段样本跳过逻辑
+- [x] 2.1 `BusinessValueCalculator` 移除 `eval()`,改用安全求值器;公式失败回退 `business_value * success_score` 并在 metadata 记录 `formula_error`
+- [x] 2.2 新增每成功任务成本: `cost_per_success = total_cost / success_count`(success_count=0 时返回 null 而非除零)
+- [x] 2.3 新增人工替代率: `human_replacement = cost_per_success / human_cost_per_task`(golden 缺 human_cost 的样本跳过并计数)
+- [x] 2.4 新增时间成本: `time_cost = total_latency_s × benchmark.time_value_rate`,计入商业价值净额
+- [x] 2.5 新增批量接口 `POST /api/v1/batches`: 入参 benchmark_id + agent_ids;为每 agent 创建带 batch_id/benchmark_id 的 run;后台并发执行(asyncio 信号量限流,默认 2)
+- [x] 2.6 批量进度查询 `GET /api/v1/batches/{batch_id}`: 每 agent run 的状态/进度/已完成 golden 数
+- [x] 2.7 新增 `app/services/comparison.py`: 输入 benchmark_id(可选 batch_id),聚合该 benchmark 下 runs,输出每 agent 的技术统计(avg/n/stddev/min/max per metric)+ 商业指标(2.2-2.4)
+- [x] 2.8 `GET /api/v1/benchmarks/{id}/leaderboard`: 调用 comparison service,默认按 cost_per_success 升序;无数据 agent 列末尾并标注
+- [x] 2.9 引擎层单元测试: 统计口径正确(手算小样本对照)、跨 benchmark 数据不混入、缺字段样本跳过逻辑
 - [ ] 2.10 提交阶段 2,验证: 构造 2 agents × 1 benchmark 的批量跑,leaderboard API 返回正确排序与统计
 
 ## 阶段 3 — Leaderboard UI

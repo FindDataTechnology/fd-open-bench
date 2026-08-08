@@ -27,6 +27,8 @@ class GoldenRepository(BaseRepository[Golden]):
                 expected_output=data.get("expected_output"),
                 expected_tools=data.get("expected_tools"),
                 business_value=data.get("business_value"),
+                human_cost=data.get("human_cost"),
+                human_minutes=data.get("human_minutes"),
                 metadata=data.get("metadata", {}),
             )
             self.db.add(golden)

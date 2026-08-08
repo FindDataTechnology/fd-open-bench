@@ -34,6 +34,12 @@ class EvaluationRun(Base):
     dataset_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False
     )
+    benchmark_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("benchmarks.id", ondelete="SET NULL"), nullable=True
+    )  # Set when the run belongs to a benchmark batch
+    batch_id: Mapped[str | None] = mapped_column(
+        String(36), nullable=True
+    )  # Groups runs of one batch (N agents × same benchmark)
     evaluation_config: Mapped[dict[str, Any]] = mapped_column(
         JSON, default=dict, nullable=False
     )  # evaluators, aggregation strategy, weights
@@ -56,6 +62,7 @@ class EvaluationRun(Base):
     # Relationships
     agent: Mapped["Agent"] = relationship(back_populates="evaluations")
     dataset: Mapped["Dataset"] = relationship()
+    benchmark: Mapped["Benchmark | None"] = relationship(back_populates="runs")
     results: Mapped[list["EvaluationResult"]] = relationship(
         back_populates="run", lazy="selectin", cascade="all, delete-orphan"
     )
@@ -67,6 +74,8 @@ class EvaluationRun(Base):
     __table_args__ = (
         Index("idx_run_agent_created", "agent_id", "created_at"),
         Index("idx_run_status_created", "status", "created_at"),
+        Index("idx_run_batch", "batch_id"),
+        Index("idx_run_benchmark", "benchmark_id"),
     )
 
     def to_dict(self) -> dict[str, Any]:
@@ -75,6 +84,8 @@ class EvaluationRun(Base):
             "id": self.id,
             "agent_id": self.agent_id,
             "dataset_id": self.dataset_id,
+            "benchmark_id": self.benchmark_id,
+            "batch_id": self.batch_id,
             "evaluation_config": self.evaluation_config,
             "status": self.status.value,
             "started_at": self.started_at.isoformat() if self.started_at else None,
@@ -90,5 +101,6 @@ class EvaluationRun(Base):
 
 if TYPE_CHECKING:
     from .agent import Agent
+    from .benchmark import Benchmark
     from .evaluation_result import EvaluationResult
     from .trace import TraceDB
