@@ -25,6 +25,8 @@ class EvaluationResponse(BaseModel):
     id: str
     agent_id: str
     dataset_id: str
+    benchmark_id: Optional[str] = None
+    batch_id: Optional[str] = None
     status: str
     tasks_total: int
     tasks_completed: int
@@ -57,16 +59,16 @@ class EvaluationResultResponse(BaseModel):
     id: str
     run_id: str
     golden_id: str
-    agent_output: str
-    token_usage: Dict[str, Any]
-    execution_time_ms: int
-    metric_scores: Dict[str, float]
-    validator_results: Dict[str, Any]
-    business_value_delivered: float
-    total_cost: float
+    agent_output: Optional[str] = None
+    token_usage: Optional[Dict[str, Any]] = None
+    execution_time_ms: Optional[int] = None
+    metric_scores: Optional[Dict[str, float]] = None
+    validator_results: Optional[Dict[str, Any]] = None
+    business_value_delivered: Optional[float] = None
+    total_cost: Optional[float] = None
     status: str
-    error_message: str
-    created_at: str
+    error_message: Optional[str] = None
+    created_at: Optional[str] = None
 
 
 @router.get("/", response_model=List[EvaluationResponse])

@@ -1,6 +1,6 @@
 # FD Open Bench - User Guide
 
-Complete guide to using the FD Open Bench Agent Performance Evaluation Platform.
+Complete guide to the FD Open Bench Agent Benchmark Platform.
 
 ## Table of Contents
 
@@ -9,52 +9,57 @@ Complete guide to using the FD Open Bench Agent Performance Evaluation Platform.
 3. [Core Concepts](#core-concepts)
 4. [Working with Agents](#working-with-agents)
 5. [Creating Test Datasets](#creating-test-datasets)
-6. [Configuring Evaluators](#configuring-evaluators)
-7. [Running Evaluations](#running-evaluations)
-8. [Analyzing Results](#analyzing-results)
-9. [Cost Analysis](#cost-analysis)
+6. [Creating Benchmarks](#creating-benchmarks)
+7. [Running Batch Evaluations](#running-batch-evaluations)
+8. [Reading the Leaderboard](#reading-the-leaderboard)
+9. [Business Metrics Explained](#business-metrics-explained)
 10. [Best Practices](#best-practices)
 
 ---
 
 ## Introduction
 
-FD Open Bench helps you evaluate AI agents by providing:
+FD Open Bench helps small teams answer one question: **which agent should we
+ship?** It compares agents on the same benchmark and reports both:
 
-- **Multi-dimensional evaluation**: Technical quality + business value
-- **Custom validators**: Regex, JSON schema, keywords, format checks
-- **LLM judges**: DeepEval metrics and custom prompts
-- **Domain executors**: SQL, API, code execution validation
-- **Business modeling**: Cost tracking vs. ROI calculation
-- **Full trace capture**: Token usage, timing, span hierarchy
+- **Technical quality**: success rate, per-metric scores (avg/stddev)
+- **Business value**: cost per successful task, ROI, human replacement ratio,
+  time cost
+
+Everything runs locally: a FastAPI backend (SQLite), a React web UI, and an
+MCP server that drives the same API from the terminal or Claude Desktop.
 
 ---
 
 ## Quick Start
 
-### Step 1: Install & Run
+### Step 1: Start the stack
 
 ```bash
-# Clone repository
-git clone <your-repo-url>
-cd fd-open-bench
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your database credentials and API keys
-
-# Start services
-docker-compose up -d
-
-# Run migrations
-docker-compose exec backend alembic upgrade head
+./start.sh        # backend on :8999, frontend on :3118
 ```
 
-### Step 2: Access Web UI
+No login required by default. (Set `FD_BENCH_API_TOKEN` on the backend to
+require a bearer token; empty = open.)
 
-Open browser and navigate to `http://localhost:3000`
+### Step 2: Open the UI
 
-Login with default credentials (configure in `.env`).
+Navigate to `http://localhost:3118` — you land on the **Leaderboard**.
+
+### Step 3: Your first comparison
+
+1. **Datasets** → create a dataset, import goldens (test cases)
+2. **Benchmarks** → create a benchmark on that dataset
+3. Benchmark detail → **Run New Batch** → select 2+ agents → run
+4. **Leaderboard** → pick the benchmark → see the comparison table
+
+The same flow works from the CLI:
+
+```bash
+fd-bench run-benchmark --benchmark paybot_v2 --agents paybot,gpt4o-bot
+fd-bench leaderboard --benchmark paybot_v2
+fd-bench report <run_id> --format markdown
+```
 
 ---
 
@@ -62,44 +67,51 @@ Login with default credentials (configure in `.env`).
 
 ### Agent
 
-An agent is an AI system you want to evaluate. Examples:
-- Customer support chatbot
-- Sales outreach assistant
-- Data analysis tool
-- Code generation bot
+An AI system you want to evaluate: a customer-support bot, a coding assistant,
+etc. Each agent has:
 
-Each agent has:
-- **Adapter type**: How it executes (OpenAI, LangChain, custom)
-- **Configuration**: Model settings, tools, prompts
-- **Pricing**: Token costs, time-based costs
+- **Adapter type**: how it executes (OpenAI-compatible, HTTP, custom)
+- **Configuration**: model settings, tools, prompts
+- **Pricing config**: token/time costs used for business metrics
 
-### Dataset (Test Cases)
+### Dataset & Golden
 
-A dataset contains multiple test cases (Goldens) used for batch evaluation.
+A dataset is a set of test cases (**goldens**). Each golden has:
 
-Each Golden includes:
-- **Input**: What to send to the agent
-- **Expected output**: Optional ground truth for comparison
-- **Expected tools**: Optional list of expected function calls
-- **Business value**: Expected value if task succeeds ($ amount)
+- **Input**: what to send to the agent
+- **Expected output** (optional): ground truth for comparison
+- **Business value** (optional): $ value if this task succeeds — drives ROI
+- **Human cost** (optional): $ cost for a human to do this task once — drives
+  the human-replacement ratio
+- **Human minutes** (optional): time a human needs for this task
 
-### Evaluator
+The three business fields are what unlock the business layer. Fill them in per
+golden when you import; missing values are skipped (and counted), never
+treated as zero.
 
-An evaluator checks specific aspects of agent output. Three types:
+### Benchmark
 
-1. **Validators**: Fast, deterministic checks (regex, JSON schema, keywords)
-2. **LLM Judges**: Flexible, expensive evaluations using LLMs
-3. **Executors**: Ground-truth validation (SQL queries, API calls, code execution)
+A benchmark pins down **how** a dataset is scored and valued:
 
-### Evaluation Run
+- **Dataset**: which goldens to run
+- **Metric suite**: which metrics to compute (accuracy, relevance, coherence,
+  completeness, custom)
+- **Value formula**: how per-task business value is computed from scores.
+  Default: `business_value * success_score`. Available variables:
+  `business_value`, `success_score`, metric scores; operators `+ - * /`,
+  comparisons, `min/max/abs/round`. Unsafe expressions are rejected (AST
+  whitelist, no attribute access, no imports).
+- **Time value rate** ($/hour): converts agent latency into a dollar cost
 
-An evaluation run processes one agent against one dataset with configured evaluators.
+> **Comparisons only ever happen within one benchmark.** Metric suites, value
+> formulas, and dataset difficulty differ across benchmarks, so cross-benchmark
+> "who's better" is meaningless by design.
 
-Outputs:
-- Individual results per test case
-- Aggregated scores across all test cases
-- Cost breakdown (tokens, time, infrastructure)
-- Business value delivered and ROI
+### Batch & Evaluation Run
+
+One **batch** = N agents × 1 benchmark. Each agent gets its own **evaluation
+run** sharing the same `batch_id`; runs execute concurrently in the background
+(semaphore-limited, default 2). A run produces one result per golden.
 
 ---
 
@@ -107,15 +119,14 @@ Outputs:
 
 ### Create an Agent
 
-From the web UI:
-1. Navigate to **Agents** → Click **+ Create Agent**
-2. Fill in:
-   - **Name**: Unique identifier
-   - **Description**: Brief explanation
-   - **Adapter Type**: Select from dropdown (OpenAI/LangChain/Custom)
-   - **Configuration**: JSON object with model settings
+From the web UI: **Agents** → **+ Create Agent**, fill in:
 
-Example OpenAI configuration:
+- **Name**: unique identifier
+- **Adapter Type**: e.g. `openai`, `http`
+- **Configuration**: JSON with model settings
+
+Example OpenAI-compatible configuration:
+
 ```json
 {
   "model": "gpt-4o",
@@ -127,9 +138,8 @@ Example OpenAI configuration:
 
 ### Configure Pricing
 
-For each agent, set pricing to track costs accurately:
+Accurate pricing = accurate business metrics. Example token-based pricing:
 
-**Token-based pricing:**
 ```json
 {
   "type": "tokens",
@@ -142,503 +152,154 @@ For each agent, set pricing to track costs accurately:
 }
 ```
 
-**Time-based pricing:**
-```json
-{
-  "type": "per_minute",
-  "rate": 0.10  // $0.10 per minute
-}
-```
-
-### View Agent Details
-
-Click on any agent to view:
-- Full configuration
-- Evaluation history
-- Performance trends
-- Associated business model
-
 ---
 
 ## Creating Test Datasets
 
-### Import Goldens via UI
+### Import Goldens
 
-1. Navigate to **Datasets** → **+ Create Dataset**
-2. Enter name and description
-3. Go to dataset detail page
-4. Click **Import Goldens**
+**Datasets** → dataset detail → **Import Goldens** accepts JSON with the
+business fields:
 
-Supported formats:
-
-**Single golden:**
-```json
-{
-  "input": "Book a flight from NYC to Paris for March 15",
-  "expected_output": "Flight XYZ booked for $450",
-  "business_value": 50.0
-}
-```
-
-**Bulk import (multiple):**
-```json
-[
-  {
-    "input": "...",
-    "expected_output": "...",
-    "business_value": ...
-  },
-  {...}
-]
-```
-
-### Add Single Golden
-
-From dataset detail page:
-1. Click **Add Golden**
-2. Fill fields:
-   - **Input**: The prompt/question to send to agent
-   - **Expected Output**: Acceptable response (optional)
-   - **Business Value**: Revenue/value if task succeeds ($)
-   - **Metadata**: Additional context (tags, category)
-
-### Example Datasets
-
-**Flight Booking:**
 ```json
 [
   {
     "input": "Find cheapest flight from NYC to London next week",
     "expected_tools": ["search_flights"],
-    "business_value": 50.0
+    "business_value": 50.0,
+    "human_cost": 12.0,
+    "human_minutes": 20
   },
-  {
-    "input": "Book round-trip flight NYC-London April 1-8",
-    "expected_tools": ["search_flights", "book_flight"],
-    "business_value": 100.0
-  }
-]
-```
-
-**Customer Support:**
-```json
-[
   {
     "input": "My order #12345 hasn't arrived yet",
     "expected_output": "Track order status and explain delay",
-    "business_value": 25.0
-  },
-  {
-    "input": "I want to return item from order #12345",
-    "expected_tools": ["lookup_order", "initiate_return"],
-    "business_value": 10.0
+    "business_value": 25.0,
+    "human_cost": 6.0,
+    "human_minutes": 10
   }
 ]
 ```
 
----
-
-## Configuring Evaluators
-
-### Validator Examples
-
-**Email Format Check:**
-```json
-{
-  "name": "email_validator",
-  "type": "validator",
-  "config": {
-    "pattern": "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
-    "must_match": true
-  }
-}
-```
-
-**Required Keywords:**
-```json
-{
-  "name": "support_phrases",
-  "type": "validator",
-  "config": {
-    "keywords": ["apologize", "helpful", "understand"],
-    "mode": "any"
-  }
-}
-```
-
-**JSON Schema Validation:**
-```json
-{
-  "name": "response_schema",
-  "type": "validator",
-  "config": {
-    "schema": {
-      "type": "object",
-      "required": ["status", "message"],
-      "properties": {
-        "status": {"enum": ["success", "error"]},
-        "message": {"type": "string"}
-      }
-    }
-  }
-}
-```
-
-### LLM Judge Examples
-
-**Helpfulness Rating:**
-```json
-{
-  "name": "helpfulness_judge",
-  "type": "llm_judge",
-  "config": {
-    "prompt": "Rate this response on helpfulness from 0-10:\n\nQuestion: {{input}}\nResponse: {{output}}\n\nReturn JSON: {\"score\": N, \"reason\": \"...\"}",
-    "score_range": [0, 10],
-    "threshold": 7,
-    "model": "gpt-4o"
-  }
-}
-```
-
-**DeepEval Metric:**
-```json
-{
-  "name": "answer_relevancy",
-  "type": "llm_judge",
-  "config": {
-    "metric": "answer_relevancy",
-    "threshold": 0.7,
-    "model": "gpt-4o"
-  }
-}
-```
-
-### Executor Examples
-
-**SQL Query Validator:**
-```json
-{
-  "name": "sql_correctness",
-  "type": "executor",
-  "config": {
-    "connection": "postgresql://...",
-    "validation": {
-      "match_mode": "exact",
-      "expected_results": [{"id": 1, "name": "Alice"}]
-    },
-    "read_only": true
-  }
-}
-```
-
-**API Response Validator:**
-```json
-{
-  "name": "api_response",
-  "type": "executor",
-  "config": {
-    "validation": {
-      "status_code": 200,
-      "response_schema": {
-        "type": "object",
-        "required": ["user_id", "status"]
-      }
-    }
-  }
-}
-```
-
-### Testing Evaluators
-
-Before using an evaluator in an evaluation run, test it:
-
-1. Navigate to **Evaluators**
-2. Click **Create Evaluator** (or select existing)
-3. Click **Test** button
-4. Enter sample input/output
-5. Review result: score, passed, reason
+Fields may be omitted — the leaderboard will show "需人工数据" for metrics that
+can't be computed rather than fabricating zeros.
 
 ---
 
-## Running Evaluations
+## Creating Benchmarks
 
-### Start New Evaluation
+**Benchmarks** → create form:
 
-1. Navigate to **Evaluations** → **+ New Evaluation**
-2. Select:
-   - **Agent**: Which agent to evaluate
-   - **Dataset**: Which test cases to use
-   - **Evaluators**: List of evaluators to apply
-3. Click **Create**
+- **Name / description**
+- **Dataset**: pick the goldens to run
+- **Metric suite**: check the metrics to compute
+- **Value formula**: e.g. `business_value * success_score`, or
+  `business_value * min(1, success_score / 0.8)` to cap credit at 0.8
+- **Time value rate**: your $/hour valuation of agent time (e.g. `50`)
 
-### Monitor Progress
-
-From the dashboard:
-- See active evaluations with live progress
-- Watch completion count increase
-- Monitor current cost accumulation
-
-From evaluation detail page:
-- Real-time progress bar
-- Individual test case results
-- Trace visualization
-- Cost breakdown
-
-### Cancel Evaluation
-
-If you need to stop an evaluation:
-
-1. Go to evaluation detail page
-2. Click **Cancel**
-3. Confirm cancellation
-
-Note: Completed tests are preserved; only pending tests are cancelled.
-
-### Retry Failed Tests
-
-After an evaluation completes:
-
-1. Go to evaluation detail page
-2. Click **Retry Failed**
-3. System re-runs only failed test cases
-4. Merges new results with original
+The benchmark detail page shows the config, the goldens (with business
+fields), batch history, and the **Run New Batch** entry point.
 
 ---
 
-## Analyzing Results
+## Running Batch Evaluations
 
-### Viewing Individual Results
+From benchmark detail → **Run New Batch**:
 
-Navigate to an evaluation run:
+1. Check the agents to compare
+2. Submit — this creates one run per agent under a shared `batch_id`
+3. You land on the batch page (`/runs/:batchId`) with live progress per agent
 
-**Summary view shows:**
-- Total cost (token + time + infrastructure)
-- Success rate
-- Average score
-- ROI calculation
+From the CLI:
 
-**Per-test-case details show:**
-- Input sent to agent
-- Agent output generated
-- Scores from each evaluator
-- Token usage breakdown
-- Execution time
-- Cost for that test case
+```bash
+fd-bench run-benchmark --benchmark paybot_v2 --agents paybot,gpt4o-bot
+fd-bench raw GET /api/v1/batches/<batch_id>     # poll progress
+```
 
-### Trace Visualization
-
-For each test case, view detailed traces:
-
-**Tree view:**
-- Hierarchical display of spans
-- Expand/collapse nested operations
-- Color-coded status (green=success, red=error)
-
-**Timeline view:**
-- Gantt chart showing parallel execution
-- Identify bottlenecks in execution flow
-
-**Trace details include:**
-- Exact input/output for each step
-- Token counts per LLM call
-- Tool execution arguments and results
-- Timing for each component
-
-### Exporting Results
-
-**CSV Export:**
-1. Go to evaluation detail page
-2. Click **Export CSV**
-3. Download file with:
-   - All test case inputs/outputs
-   - Scores and pass/fail status
-   - Costs and timestamps
-
-**PDF Report:**
-1. Go to evaluation detail page
-2. Click **Export PDF**
-3. Receive formatted report with:
-   - Executive summary
-   - Score distributions
-   - Charts and graphs
-   - Recommendations
+Runs execute concurrently (default 2 at a time) in the background.
 
 ---
 
-## Cost Analysis
+## Reading the Leaderboard
 
-### Understanding Cost Components
+The home page (`/`) is the leaderboard. Pick a benchmark; the table shows one
+row per agent that has runs on it:
 
-Total cost = **Token Cost** + **Time Cost** + **Infrastructure Cost**
+| Column | Meaning |
+|--------|---------|
+| Success Rate | succeeded tasks / total tasks |
+| Avg Score | mean ± stddev across metric scores |
+| Cost per Success | total cost / successful tasks (null if no successes) |
+| ROI | (business value − cost − time cost) / (cost + time cost) |
+| vs Human | cost per success / avg human cost — **green < 1× = cheaper than human** |
+| Time Cost | total latency (s) × time value rate / 3600 |
 
-**Token Cost:**
-- Input tokens × input_price
-- Output tokens × output_price
-- Varies by model (gpt-4, claude, etc.)
+Sort by any business column. Click through to batch/run detail for per-golden
+results and traces. Cells that can't be computed show a hint ("补全人工成本数
+据后可用") instead of a fake zero.
 
-**Time Cost:**
-- Per-minute or per-hour pricing
-- Based on total execution duration
-- Useful for long-running agents
+---
 
-**Infrastructure Cost:**
-- Server costs (if self-hosted)
-- External API calls (flight search, etc.)
-- Database operations
+## Business Metrics Explained
 
-### Using Cost Analyzer
-
-Navigate to **Cost Analyzer**:
-
-1. Select agent and date range
-2. View **Cost Breakdown** pie chart:
-   - Percentage from each cost type
-   - Dollar amounts
-
-3. Review **ROI Trends** line chart:
-   - Historical ROI over selected period
-   - Identify improvement or degradation
-
-4. Examine **Daily Costs** bar chart:
-   - Stack of token/time/infra costs by day
-   - Spot anomalies or spikes
-
-### Calculating ROI
-
-ROI formula:
 ```
-ROI = (Business Value - Total Cost) / Total Cost
+cost_per_success  = total_cost / success_count          (null at 0 successes)
+human_replacement = cost_per_success / avg(human_cost)  (over goldens that have it)
+time_cost         = total_latency_s × time_value_rate / 3600
+net_value         = total_business_value − total_cost − time_cost
+roi               = net_value / (total_cost + time_cost)
 ```
 
-**Example interpretation:**
-- ROI of 200% means you earn $3 for every $1 spent
-- Negative ROI means costs exceed value
-- Break-even at 0% ROI
-
-### Cost Alerts
-
-Configure alerts to monitor spending:
-
-```json
-{
-  "type": "cost_per_task",
-  "threshold": 1.00,  // Alert if > $1/task
-  "action": "email"    // Send email notification
-}
-```
-
-Navigate to agent configuration → **Alerts** tab to set these.
+- `total_business_value` sums the benchmark's **value formula** evaluated per
+  golden (formula errors fall back to `business_value * success_score` and are
+  recorded in metadata as `formula_error`).
+- Goldens missing `human_cost` are skipped from the human-cost average and
+  counted — a missing average yields a null `human_replacement`, not zero.
+- The `export_report` MCP tool / `fd-bench report` includes a **Business
+  Conclusion** section: recommended agent, reasons, and data-gap hints.
 
 ---
 
 ## Best Practices
 
-### Testing Strategy
-
-1. **Start small**: Begin with 5-10 test cases
-2. **Validate quickly**: Use fast validators first
-3. **Add LLM judges**: Once basic quality confirmed
-4. **Scale up**: Gradually increase test count
-5. **Automate**: Schedule regular evaluations
-
-### Evaluator Selection
-
-**Use validators when:**
-- Checking data formats (emails, URLs, dates)
-- Validating required fields present
-- Enforcing length constraints
-
-**Use LLM judges when:**
-- Assessing semantic quality (helpfulness, tone)
-- Comparing multiple acceptable answers
-- Evaluating creativity or reasoning
-
-**Use executors when:**
-- Validating against ground truth (SQL results)
-- Testing code correctness (run tests)
-- Verifying API contract compliance
-
 ### Dataset Design
 
-**Cover edge cases:**
-- Missing parameters
-- Ambiguous requests
-- Error conditions
-- Boundary values
+- Cover edge cases: missing parameters, ambiguous requests, error conditions
+- Fill `business_value` / `human_cost` / `human_minutes` per golden — without
+  them the business layer stays empty
+- Balance high-value scenarios with common ones
 
-**Include business diversity:**
-- Different customer segments
-- Various price points
-- Multiple domains/products
+### Benchmark Hygiene
 
-**Balance coverage:**
-- High-value scenarios (more weight)
-- Common scenarios (representative)
-- Rare scenarios (edge cases)
+- One benchmark per decision ("which support bot to ship"), not per experiment
+- Keep the metric suite stable once you start comparing — changing it
+  mid-stream makes old runs incomparable
+- Write the value formula to match how your business actually counts value
 
 ### Cost Optimization
 
-**Monitor token usage:**
-- Track which prompts consume most tokens
-- Optimize system prompts for conciseness
-- Use smaller models where appropriate
-
-**Review execution patterns:**
-- Identify redundant LLM calls
-- Cache repeated responses
-- Parallelize independent operations
-
-**Set budgets:**
-- Define monthly spend limits
-- Enable cost alerts at 80% threshold
-- Review regularly and adjust pricing
-
-### Evaluation Frequency
-
-**Recommended schedule:**
-- **New agents**: Daily evaluations during development
-- **Stable agents**: Weekly evaluations for regression detection
-- **Production changes**: Pre-deployment + post-deployment
-- **Business metrics**: Monthly trend analysis
+- Track which prompts consume the most tokens
+- Use smaller models where quality allows; compare them on the same benchmark
+  to prove it
+- Re-run batches after agent changes; the leaderboard aggregates all runs per
+  agent on the benchmark
 
 ---
 
 ## Troubleshooting
 
-### Common Issues
+**Evaluation hangs**
+- Cause: agent not returning a response
+- Solution: check timeout settings, verify agent health
 
-**Issue: Evaluation hangs**
-- Cause: Agent not returning response
-- Solution: Check timeout settings, verify agent health
+**Business columns empty**
+- Cause: goldens lack `business_value` / `human_cost`
+- Solution: re-import goldens with the business fields filled
 
-**Issue: High costs**
-- Cause: Too many LLM calls, inefficient prompts
-- Solution: Enable caching, optimize prompts, reduce iteration loops
-
-**Issue: Low scores**
-- Cause: Agent quality, inappropriate evaluators
-- Solution: Review evaluator thresholds, improve agent prompt
-
-**Issue: Missing trace data**
-- Cause: Tracing not enabled in adapter
-- Solution: Verify @observe decorators are applied
+**All runs fail immediately**
+- Cause: agent config missing/invalid (no real model behind the adapter)
+- Solution: verify the agent's adapter config; test with a direct API call
 
 ---
 
-## Next Steps
-
-After completing this guide:
-1. Review API documentation at `/docs`
-2. Explore code examples in `/examples`
-3. Join community forum for support
-4. Attend quarterly training sessions
-
-For advanced topics:
-- Custom evaluator development
-- Multi-agent coordination evaluation
-- Production monitoring setup
-- Custom integrations
-
----
-
-*This guide is version 1.0 and reflects the current feature set. Updates will be posted as new capabilities are added.*
+*This guide reflects the current benchmark-centric workflow.*

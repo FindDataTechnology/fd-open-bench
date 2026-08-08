@@ -47,17 +47,17 @@
 - [x] 3.6 Golden 编辑/导入界面支持 business_value/human_cost/human_minutes
 - [x] 3.7 删除 Dashboard、独立 CostAnalyzer、Evaluators 独立页及其路由;Layout 导航收敛为 Leaderboard/Benchmarks/Agents/Settings
 - [x] 3.8 商业列空态处理: 无 human_cost 数据时显示"补全人工成本数据后可用"而非 0 或报错
-- [ ] 3.9 提交阶段 3,验证: 前端构建通过;完整走通"建 benchmark → 跑批量 → 看榜 → 钻取详情"
+- [x] 3.9 提交阶段 3,验证: 前端构建通过;完整走通"建 benchmark → 跑批量 → 看榜 → 钻取详情"
 
 ## 阶段 4 — MCP/CLI 同步
 
-- [ ] 4.1 `compare_agents` 改为必选 benchmark 参数: 调 leaderboard API,返回完整对比表(技术+商业),拒绝跨 benchmark 对比
-- [ ] 4.2 新增 MCP 工具 `run_benchmark`(benchmark + agents 名/ID → 创建批量)与 `get_leaderboard`(benchmark → 榜)
-- [ ] 4.3 `export_report` 增加商业结论段: 推荐 agent、推荐理由(每成功任务成本/ROI/人工替代率)、数据缺口提示
-- [ ] 4.4 `analyze_weaknesses` / `find_best_performer` 迁移到 benchmark 语义(弃用"agent 全部 run 混算")
-- [ ] 4.5 `fd-bench` CLI 同步: `run-eval` → `run-benchmark`;`report` 输出商业结论;保留 `raw` 逃生舱
-- [ ] 4.6 更新 docs/(user-guide.md、mcp-guide.md)与 README 的 CLI 示例
-- [ ] 4.7 提交阶段 4,验证: Claude Code 中 `compare_agents` 返回同基准对比表;`report` 含推荐结论
+- [x] 4.1 `compare_agents` 改为必选 benchmark 参数: 调 leaderboard API,返回完整对比表(技术+商业),拒绝跨 benchmark 对比
+- [x] 4.2 新增 MCP 工具 `run_benchmark`(benchmark + agents 名/ID → 创建批量)与 `get_leaderboard`(benchmark → 榜)
+- [x] 4.3 `export_report` 增加商业结论段: 推荐 agent、推荐理由(每成功任务成本/ROI/人工替代率)、数据缺口提示
+- [x] 4.4 `analyze_weaknesses` / `find_best_performer` 迁移到 benchmark 语义(弃用"agent 全部 run 混算")
+- [x] 4.5 `fd-bench` CLI 同步: `run-eval` → `run-benchmark`;`report` 输出商业结论;保留 `raw` 逃生舱
+- [x] 4.6 更新 docs/(user-guide.md、mcp-guide.md)与 README 的 CLI 示例
+- [x] 4.7 提交阶段 4,验证: Claude Code 中 `compare_agents` 返回同基准对比表;`report` 含推荐结论
 
 ## 阶段 5 — 收尾
 

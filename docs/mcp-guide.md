@@ -44,8 +44,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8999
       "args": ["mcp", "serve"],
       "env": {
         "FD_BENCH_API_URL": "http://localhost:8999",
-        "ANTHROPIC_API_KEY": "sk-your-key-here",
-        "ANTHROPIC_BASE_URL": "https://your-llm-endpoint/v1"
+        "ANTHROPIC_API_KEY": "sk-your-key-here"
       }
     }
   }
@@ -58,45 +57,115 @@ uvicorn app.main:app --host 0.0.0.0 --port 8999
 
 ## 可用工具
 
-### 7 个领域级工具 + 1 个 raw_api 逃逸通道
+### 9 个领域级工具 + 1 个 raw_api 逃逸通道
 
 | 工具 | 用途 | 关键参数 |
 |------|------|---------|
-| `run_evaluation` | 启动评估运行 | `agent`, `dataset`, `metrics[]` |
+| `run_benchmark` | 在同一 benchmark 上批量评估多个 agent | `benchmark`, `agents[]` |
+| `get_leaderboard` | 获取 benchmark 排行榜(技术+商业指标) | `benchmark`, `sort_by`, `sort_order` |
+| `run_evaluation` | 启动单个评估运行(底层原语) | `agent`, `dataset`, `metrics[]` |
 | `get_evaluation_status` | 查询进度 | `run_id` |
-| `analyze_weaknesses` | 识别最弱指标 | `run_id` 或 `agent_id` |
-| `compare_agents` | 对比多个 agent | `agent_ids[]`, `metric` |
-| `find_best_performer` | 找到最佳 agent | `dataset`, `metric` |
-| `export_report` | 生成报告 | `run_id`, `format` |
+| `analyze_weaknesses` | 识别 agent 在某 benchmark 上的最弱指标 | `benchmark`, `agent_id?` |
+| `compare_agents` | 同一 benchmark 内对比 agent(含商业指标) | `benchmark`, `agent_ids[]?` |
+| `find_best_performer` | 找到 benchmark 上某指标最佳的 agent | `benchmark`, `metric` |
+| `export_report` | 生成报告(含商业结论段) | `run_id`, `format` |
 | `raw_api` | 任意 REST 调用（不稳定） | `method`, `path`, `params`, `body` |
+
+> **核心语义：** 所有对比都发生在**同一个 benchmark** 内。跨 benchmark 的
+> "谁更好" 没有意义——指标套件、价值公式、数据难度都可能不同。
 
 ---
 
 ## 详细使用说明
 
-### 1. run_evaluation
+### 1. run_benchmark
 
-**作用：** 为指定 agent 和 dataset 启动评估，可选 metrics 列表。
+**作用：** 在同一 benchmark 上批量评估多个 agent（一次创建 N 个带相同
+`batch_id` 的 run，后台并发执行）。这是发起评估的**首选方式**——只有同
+benchmark 同批的数据才有可比性。
 
 **CLI 单条调用：**
 
 ```bash
-fd-bench run-eval \
-  --agent paybot \
-  --dataset goldens_v2 \
-  --metrics task_completion,step_efficiency,plan_quality
+fd-bench run-benchmark \
+  --benchmark paybot_v2 \
+  --agents paybot,gpt4o-bot
 ```
 
 **返回：**
 
 ```json
 {
-  "run_id": "uuid-...",
-  "status": "running",
-  "tasks_total": 42,
-  "tasks_completed": 0,
-  ...
+  "batch_id": "uuid-...",
+  "status": "started",
+  "agent_count": 2,
+  "benchmark_id": "uuid-..."
 }
+```
+
+**MCP 工具调用（Chat 模式）：**
+
+```
+user: "在 paybot_v2 上跑 paybot 和 gpt4o-bot"
+→ MCP server: 解析 benchmark/agent 名称→ID，POST /api/v1/batches/，返回 batch_id
+→ Claude: "已启动批量评估 batch abc123..."
+```
+
+**注意：** `benchmark` 和 `agents` 接受**名称**或 ID，由 MCP 工具自动解析。
+
+---
+
+### 2. get_leaderboard
+
+**作用：** 获取某 benchmark 的完整排行榜——每 agent 的技术统计
+(avg/stddev/success_rate) + 商业指标 (cost_per_success / ROI /
+human_replacement / time_cost)。
+
+**CLI：**
+
+```bash
+fd-bench leaderboard --benchmark paybot_v2 --sort-by cost_per_success --sort-order asc
+```
+
+**返回：**
+
+```json
+{
+  "benchmark_id": "...",
+  "benchmark_name": "paybot_v2",
+  "leaderboard": [
+    {
+      "agent_id": "...",
+      "agent_name": "paybot",
+      "run_count": 1,
+      "task_count": 42,
+      "success_rate": 0.86,
+      "avg_score": 0.81,
+      "cost_per_success": 0.34,
+      "roi": 2.41,
+      "human_replacement": 0.11,
+      "time_cost": 0.58
+    }
+  ],
+  "sort_by": "cost_per_success",
+  "sort_order": "asc"
+}
+```
+
+---
+
+### 3. run_evaluation（底层原语）
+
+**作用：** 为单个 agent + dataset 启动一次评估运行。**不带 benchmark 上下文**
+（无 batch_id / benchmark_id），结果不进入任何排行榜。一般不需要直接用——
+优先用 `run_benchmark`。
+
+**CLI 单条调用：**
+
+```bash
+# 无独立 CLI 子命令；通过 raw 通道或直接 MCP 调用:
+fd-bench raw POST /api/v1/evaluations/ \
+  --body '{"agent_id":"...","dataset_id":"...","evaluator_configs":[]}'
 ```
 
 **MCP 工具调用（Chat 模式）：**
@@ -111,7 +180,7 @@ user: "为 paybot 对 goldens_v2 运行评估，用 task_completion 和 step_eff
 
 ---
 
-### 2. get_evaluation_status
+### 4. get_evaluation_status
 
 **作用：** 轮询评估运行的状态、进度和摘要。
 
@@ -145,29 +214,27 @@ user: "评估 run abc123 现在怎么样？"
 
 ---
 
-### 3. analyze_weaknesses
+### 5. analyze_weaknesses
 
-**作用：** 分析最低分指标，找出 agent/dataset 的表现弱点。
+**作用：** 分析某 agent 在指定 benchmark 上的最低分指标，找出表现弱点。
 
 **CLI：**
 
 ```bash
-# 针对单个 run
-fd-bench weaknesses --run-id <run_id> --top 3
-
-# 针对 agent（自动找最新 run）
-fd-bench weaknesses --agent-id <agent_id>
+# 分析指定 agent(缺省为该 benchmark 榜首 agent)
+fd-bench weaknesses --benchmark paybot_v2 --agent-id <agent_id> --top 3
 ```
 
 **返回：**
 
 ```json
 {
+  "benchmark_id": "...",
+  "agent_id": "...",
   "run_id": "...",
   "weaknesses": [
     {"metric": "plan_quality", "avg_score": 0.61},
-    {"metric": "step_efficiency", "avg_score": 0.65},
-    ...
+    {"metric": "step_efficiency", "avg_score": 0.65}
   ]
 }
 ```
@@ -175,34 +242,44 @@ fd-bench weaknesses --agent-id <agent_id>
 **Chat 模式用法：**
 
 ```
-user: "paybot 的弱点是什么？"
-→ MCP: analyze_weaknesses(agent_id="paybot")
+user: "paybot 在 paybot_v2 上的弱点是什么？"
+→ MCP: analyze_weaknesses(benchmark="paybot_v2", agent_id="paybot")
 → Claude: "表现最弱的三个指标是..."
 ```
 
 ---
 
-### 4. compare_agents
+### 6. compare_agents
 
-**作用：** 对比多个 agent 在同一 metric 上的表现。
+**作用：** 在同一 benchmark 内对比多个 agent——返回技术 + 商业完整对比表。
+`benchmark` 为必选参数，**拒绝跨 benchmark 对比**。
 
 **CLI：**
 
 ```bash
-fd-bench compare \
-  --agents agent1,agent2,agent3 \
-  --metric task_completion
+fd-bench compare --benchmark paybot_v2                       # 全部有数据的 agent
+fd-bench compare --benchmark paybot_v2 --agents agent1,agent2
 ```
 
 **返回：**
 
 ```json
 {
-  "metric": "task_completion",
+  "benchmark_id": "...",
+  "benchmark_name": "paybot_v2",
   "comparison": [
-    {"agent_id": "agent1", "runs": 5, "avg_score": 0.82},
-    {"agent_id": "agent2", "runs": 3, "avg_score": 0.76},
-    ...
+    {
+      "agent_id": "...",
+      "agent_name": "paybot",
+      "run_count": 1,
+      "task_count": 42,
+      "success_rate": 0.86,
+      "avg_score": 0.81,
+      "cost_per_success": 0.34,
+      "roi": 2.41,
+      "human_replacement": 0.11,
+      "time_cost": 0.58
+    }
   ]
 }
 ```
@@ -210,50 +287,52 @@ fd-bench compare \
 **Chat 模式用法：**
 
 ```
-user: "对比一下 paybot 和 chatbot 的任务完成度"
-→ MCP: compare_agents(["paybot", "chatbot"], "task_completion")
-→ Claude: "paybot 平均 82%，chatbot 76%..."
+user: "对比一下 paybot_v2 上 paybot 和 chatbot 谁更值得上线"
+→ MCP: compare_agents(benchmark="paybot_v2", agent_ids=["paybot", "chatbot"])
+→ Claude: "paybot 每成功任务成本 $0.34、ROI 2.41；chatbot ..."
 ```
 
 ---
 
-### 5. find_best_performer
+### 7. find_best_performer
 
-**作用：** 在一个 dataset 上找到最高分的 agent。
+**作用：** 在一个 benchmark 上找到某指标最佳的 agent。
 
 **CLI：**
 
 ```bash
-fd-bench best \
-  --dataset production_test \
-  --metric task_completion
+fd-bench best --benchmark paybot_v2 --metric cost_per_success
+# metric 可选: cost_per_success | roi | human_replacement | avg_score | success_rate
 ```
 
 **返回：**
 
 ```json
 {
-  "metric": "task_completion",
-  "dataset_id": "...",
+  "benchmark_id": "...",
+  "benchmark_name": "paybot_v2",
+  "metric": "cost_per_success",
   "agent_id": "...",
-  "run_id": "...",
-  "score": 0.91
+  "agent_name": "paybot",
+  "value": 0.34
 }
 ```
 
 **Chat 模式用法：**
 
 ```
-user: "production_test 数据集上哪个 agent 表现最好？"
-→ MCP: find_best_performer(dataset="production_test")
-→ Claude: "agent 'best_agent' 以 91% 得分领先..."
+user: "paybot_v2 上哪个 agent 每成功任务成本最低？"
+→ MCP: find_best_performer(benchmark="paybot_v2", metric="cost_per_success")
+→ Claude: "agent 'paybot' 以 $0.34/成功任务领先..."
 ```
 
 ---
 
-### 6. export_report
+### 8. export_report
 
-**作用：** 将评估结果导出为 Markdown 或 JSON。
+**作用：** 将评估结果导出为 Markdown 或 JSON。若该 run 属于某个 benchmark，
+报告自动包含**商业结论段**：推荐 agent、推荐理由（每成功任务成本/ROI/人工
+替代率）、数据缺口提示。
 
 **CLI：**
 
@@ -272,6 +351,7 @@ fd-bench report <run_id> --format json
 
 - **Run**: uuid-...
 - **Agent**: agent_id
+- **Benchmark**: paybot_v2
 - **Dataset**: dataset_id
 - **Status**: completed
 - **Tasks**: 42/42 (failed: 0)
@@ -281,6 +361,18 @@ fd-bench report <run_id> --format json
 ```json
 { ... }
 ```
+
+## Business Conclusion
+
+**推荐 Agent**: paybot (`agent_id`)
+
+推荐理由:
+- 每成功任务成本最低: 0.3400
+- ROI: 2.41
+- 人工替代率: 0.1100 (每成功任务成本/平均人工成本, 小于 1 表示比人工便宜)
+
+数据缺口提示:
+- 部分 golden 未填 business_value,ROI/净值结果不准确。
 
 ## Results (42)
 - `<id>` golden=`xxx` status=success cost=0.3 [task_completion=0.9, ...]
@@ -298,7 +390,7 @@ user: "给我这次评估的 markdown 报告"
 
 ---
 
-### 7. raw_api
+### 9. raw_api
 
 **警告：** 不稳定逃逸通道，backend API 变更时可能失效。
 
@@ -333,21 +425,23 @@ user: "获取前 5 个 dataset"
 fd-bench --help
 
 位置参数：
-  {mcp,run-eval,status,weaknesses,compare,best,report,raw,chat} ...
+  {mcp,run-benchmark,status,leaderboard,weaknesses,compare,best,report,raw,chat} ...
 
 mcp                     运行 MCP 服务器 (stdio/HTTP)
   serve                 服务 MCP (默认 stdio; --http/--port 切换)
-run-eval                启动评估运行
-                        --agent, --dataset, --metrics
+run-benchmark           在同一 benchmark 上批量评估多个 agent
+                        --benchmark, --agents (逗号分隔)
 status                  查询评估状态
                         <run_id>
+leaderboard             查看 benchmark 排行榜
+                        --benchmark, --sort-by, --sort-order
 weaknesses              分析最弱指标
-                        --run-id / --agent-id, --top
-compare                 对比 agent
-                        --agents (逗号分隔), --metric
-best                    查找最佳 performer
-                        --dataset, --metric
-report                  导出报告
+                        --benchmark, --agent-id(可选), --top
+compare                 同一 benchmark 内对比 agent
+                        --benchmark, --agents (逗号分隔,可选)
+best                    查找 benchmark 最佳 performer
+                        --benchmark, --metric
+report                  导出报告(含商业结论段)
                         <run_id>, --format [markdown|json]
 raw                     原始 REST 调用 (不稳定)
                         <METHOD> <path> [--params] [--body]
@@ -371,10 +465,10 @@ fd-bench chat
 
 ```
 fd-bench> 列出可用的 agents
+fd-bench> 在 paybot_v2 上跑 paybot 和 gpt4o-bot
+fd-bench> paybot_v2 排行榜上谁第一？按 ROI 排呢？
 fd-bench> 为什么 paybot 在 plan_quality 上得分低？
-fd-bench> 生产测试数据集中谁表现最好？
-fd-bench> 给 run xyz 生成 markdown 报告
-fd-bench> 比较 agent1 和 agent2 的成本效益
+fd-bench> 给 run xyz 生成 markdown 报告，告诉我推荐上线哪个 agent
 ```
 
 ### 环境变量
@@ -422,7 +516,7 @@ fd-bench mcp serve --http --port 8998
 ### Q: MCP 工具和 `fd-bench chat` 有什么区别？
 
 **A:** 
-- `fd-bench run-eval ...` — 单次命令，无 LLM，适合脚本/自动化
+- `fd-bench run-benchmark ...` — 单次命令，无 LLM，适合脚本/自动化
 - `fd-bench chat` — REPL，Claude 调用工具，适合自然语言探索
 - Claude Desktop — 独立的 Claude Desktop 应用，读取 `.mcp.json`，完全相同的一排工具
 
@@ -467,7 +561,7 @@ curl -v http://localhost:8999/api/v1/agents
 
 **A:** 可以！工具在 `mcp_server/tools/`：
 - `evaluation.py` — `run_evaluation`, `get_evaluation_status`
-- `analysis.py` — `analyze_weaknesses`, `compare_agents`, `find_best_performer`
+- `analysis.py` — `analyze_weaknesses`, `compare_agents`, `find_best_performer`, `get_leaderboard`, `run_benchmark`
 - `reporting.py` — `export_report`
 - `raw.py` — `raw_api`
 

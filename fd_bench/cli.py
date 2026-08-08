@@ -1,7 +1,7 @@
 """fd-bench command-line interface.
 
 One binary, two modes — both drive the same MCP server subprocess:
-  - one-shot: `fd-bench run-eval ...` (no LLM; calls one tool directly)
+  - one-shot: `fd-bench run-benchmark ...` (no LLM; calls one tool directly)
   - chat:     `fd-bench chat`        (Claude + MCP tools)
 """
 import argparse
@@ -26,30 +26,36 @@ def main() -> None:
     p_serve.set_defaults(func=cmd_serve)
 
     # one-shot tools (1:1 with domain tools)
-    p_run = sub.add_parser("run-eval", help="Start an evaluation run.")
-    p_run.add_argument("--agent", required=True)
-    p_run.add_argument("--dataset", required=True)
-    p_run.add_argument("--metrics", default=None, help="comma-separated metric names")
-    p_run.set_defaults(func=cmd_run_eval)
+    p_run = sub.add_parser("run-benchmark", help="Run a batch of agents on a benchmark.")
+    p_run.add_argument("--benchmark", required=True, help="benchmark name or ID")
+    p_run.add_argument("--agents", required=True, help="comma-separated agent names or IDs")
+    p_run.set_defaults(func=cmd_run_benchmark)
 
     p_status = sub.add_parser("status", help="Get evaluation status.")
     p_status.add_argument("run_id")
     p_status.set_defaults(func=cmd_status)
 
-    p_weak = sub.add_parser("weaknesses", help="Analyze weakest metrics.")
-    p_weak.add_argument("--run-id", dest="run_id")
+    p_board = sub.add_parser("leaderboard", help="Get a benchmark leaderboard.")
+    p_board.add_argument("--benchmark", required=True, help="benchmark name or ID")
+    p_board.add_argument("--sort-by", default="cost_per_success")
+    p_board.add_argument("--sort-order", choices=["asc", "desc"], default="asc")
+    p_board.set_defaults(func=cmd_leaderboard)
+
+    p_weak = sub.add_parser("weaknesses", help="Analyze weakest metrics on a benchmark.")
+    p_weak.add_argument("--benchmark", required=True, help="benchmark name or ID")
     p_weak.add_argument("--agent-id", dest="agent_id")
     p_weak.add_argument("--top", type=int, default=5)
     p_weak.set_defaults(func=cmd_weaknesses)
 
-    p_cmp = sub.add_parser("compare", help="Compare agents on a metric.")
-    p_cmp.add_argument("--agents", required=True, help="comma-separated agent IDs")
-    p_cmp.add_argument("--metric", default="task_completion")
+    p_cmp = sub.add_parser("compare", help="Compare agents on a benchmark.")
+    p_cmp.add_argument("--benchmark", required=True, help="benchmark name or ID")
+    p_cmp.add_argument("--agents", default=None, help="comma-separated agent IDs (default: all)")
     p_cmp.set_defaults(func=cmd_compare)
 
-    p_best = sub.add_parser("best", help="Find best performer on a dataset.")
-    p_best.add_argument("--dataset", required=True)
-    p_best.add_argument("--metric", default="task_completion")
+    p_best = sub.add_parser("best", help="Find best performer on a benchmark.")
+    p_best.add_argument("--benchmark", required=True, help="benchmark name or ID")
+    p_best.add_argument("--metric", default="cost_per_success",
+                        help="cost_per_success | roi | human_replacement | avg_score | success_rate")
     p_best.set_defaults(func=cmd_best)
 
     p_rep = sub.add_parser("report", help="Export a run report.")
@@ -81,29 +87,36 @@ def cmd_serve(args) -> None:
     run_server(http=args.http, port=args.port)
 
 
-def cmd_run_eval(args) -> None:
-    metrics = args.metrics.split(",") if args.metrics else None
-    _print(_call("run_evaluation", {
-        "agent": args.agent, "dataset": args.dataset, "metrics": metrics}))
+def cmd_run_benchmark(args) -> None:
+    agents = [a for a in args.agents.split(",") if a]
+    _print(_call("run_benchmark", {"benchmark": args.benchmark, "agents": agents}))
 
 
 def cmd_status(args) -> None:
     _print(_call("get_evaluation_status", {"run_id": args.run_id}))
 
 
+def cmd_leaderboard(args) -> None:
+    _print(_call("get_leaderboard", {
+        "benchmark": args.benchmark,
+        "sort_by": args.sort_by,
+        "sort_order": args.sort_order,
+    }))
+
+
 def cmd_weaknesses(args) -> None:
     _print(_call("analyze_weaknesses", {
-        "run_id": args.run_id, "agent_id": args.agent_id, "top_n": args.top}))
+        "benchmark": args.benchmark, "agent_id": args.agent_id, "top_n": args.top}))
 
 
 def cmd_compare(args) -> None:
-    agent_ids = [a for a in args.agents.split(",") if a]
-    _print(_call("compare_agents", {"agent_ids": agent_ids, "metric": args.metric}))
+    agent_ids = [a for a in args.agents.split(",") if a] if args.agents else None
+    _print(_call("compare_agents", {"benchmark": args.benchmark, "agent_ids": agent_ids}))
 
 
 def cmd_best(args) -> None:
     _print(_call("find_best_performer", {
-        "dataset": args.dataset, "metric": args.metric}))
+        "benchmark": args.benchmark, "metric": args.metric}))
 
 
 def cmd_report(args) -> None:

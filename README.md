@@ -110,7 +110,6 @@ by cost per successful task.
 ## CLI & MCP
 
 `fd-bench` drives the platform through an MCP server — no browser needed.
-Usage is unchanged by the refactor.
 
 ### Setup
 
@@ -123,10 +122,13 @@ export ANTHROPIC_API_KEY=sk-ant-...                 # only for `fd-bench chat`
 ### One-shot (scriptable, no LLM)
 
 ```bash
-fd-bench run-eval --agent paybot --dataset goldens_v2 --metrics task_completion,step_efficiency
+fd-bench run-benchmark --benchmark paybot_v2 --agents paybot,gpt4o-bot
 fd-bench status <run_id>
-fd-bench report <run_id> --format markdown > report.md
-fd-bench weaknesses --agent-id <agent_id> --top 3
+fd-bench leaderboard --benchmark paybot_v2 --sort-by cost_per_success
+fd-bench compare --benchmark paybot_v2              # same-benchmark tech + business table
+fd-bench best --benchmark paybot_v2 --metric roi
+fd-bench report <run_id> --format markdown > report.md   # includes business conclusion
+fd-bench weaknesses --benchmark paybot_v2 --agent-id <agent_id> --top 3
 fd-bench raw GET /api/v1/agents                     # unstable escape hatch
 ```
 
@@ -134,7 +136,7 @@ fd-bench raw GET /api/v1/agents                     # unstable escape hatch
 
 ```bash
 fd-bench chat
-fd-bench> "evaluate paybot on goldens_v2, then tell me where it's weakest"
+fd-bench> "run paybot and gpt4o-bot on paybot_v2, then recommend which one to ship"
 ```
 
 Chat defaults to `claude-opus-4-8`; override with `FD_BENCH_MODEL=claude-sonnet-5`.
@@ -150,10 +152,11 @@ Chat defaults to `claude-opus-4-8`; override with `FD_BENCH_MODEL=claude-sonnet-
 }
 ```
 
-Domain tools (`run_evaluation`, `get_evaluation_status`, `analyze_weaknesses`,
-`compare_agents`, `find_best_performer`, `export_report`) plus the unstable
-`raw_api` escape hatch. Every `raw_api` call is logged — repeated patterns get
-promoted into dedicated tools.
+Domain tools (`run_benchmark`, `get_leaderboard`, `run_evaluation`,
+`get_evaluation_status`, `analyze_weaknesses`, `compare_agents`,
+`find_best_performer`, `export_report`) plus the unstable `raw_api` escape
+hatch. Every `raw_api` call is logged — repeated patterns get promoted into
+dedicated tools.
 
 ### Transports
 
