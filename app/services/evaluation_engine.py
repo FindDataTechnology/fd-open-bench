@@ -54,6 +54,18 @@ class EvaluationEngine:
         if not dataset:
             raise ValueError(f"Dataset {dataset_id} not found or empty")
 
+        # Use the run's benchmark value formula, if any, so business value
+        # per task follows the benchmark config (not just raw sums).
+        from app.models import Benchmark, EvaluationRun
+        run = self.db.query(EvaluationRun).filter(EvaluationRun.id == run_id).first()
+        benchmark = None
+        if run and run.benchmark_id:
+            benchmark = self.db.query(Benchmark).filter(Benchmark.id == run.benchmark_id).first()
+        if benchmark and benchmark.value_formula:
+            self.business_calculator = BusinessValueCalculator(
+                {"value_formula": benchmark.value_formula}
+            )
+
         # Initialize evaluators
         evaluators = []
         for config in evaluator_configs:
@@ -105,6 +117,16 @@ class EvaluationEngine:
             trace = self.trace_service.end_trace(run_id)
             self.token_service.update_trace_with_costs(trace)
 
+            # Merge the golden's business columns (the canonical source) into
+            # the formula context, overriding any legacy extra_metadata values.
+            golden_metadata = dict(golden.extra_metadata or {})
+            if golden.business_value is not None:
+                golden_metadata["business_value"] = float(golden.business_value)
+            if golden.human_cost is not None:
+                golden_metadata["human_cost"] = float(golden.human_cost)
+            if golden.human_minutes is not None:
+                golden_metadata["human_minutes"] = golden.human_minutes
+
             # Create evaluation context
             context = EvaluationContext(
                 input=golden.input,
@@ -114,7 +136,7 @@ class EvaluationEngine:
                 token_usage=self.token_service.aggregate_tokens(trace),
                 execution_time_ms=trace.total_duration_ms,
                 agent_config=agent.config,
-                golden_metadata=golden.extra_metadata or {},
+                golden_metadata=golden_metadata,
                 business_context={}
             )
 
@@ -134,11 +156,15 @@ class EvaluationEngine:
                     'error': result.error
                 })
 
-            # Calculate business value
+            # Calculate business value (formula context gets the measured latency/tokens)
+            golden_metadata["latency_s"] = (trace.total_duration_ms or 0) / 1000.0
+            tu = context.token_usage or {}
+            golden_metadata["input_tokens"] = tu.get("input_tokens", 0)
+            golden_metadata["output_tokens"] = tu.get("output_tokens", 0)
             business_value = self.business_calculator.calculate_business_value(
                 task_completed=True,
                 success_score=sum(r['score'] for r in evaluator_results) / len(evaluator_results) if evaluator_results else 0,
-                golden_metadata=golden.extra_metadata or {}
+                golden_metadata=golden_metadata
             )
 
             # Calculate total cost
@@ -260,9 +286,10 @@ class EvaluationEngine:
             for name, scores in evaluator_scores.items()
         }
 
-        # Calculate totals
+        # Calculate totals (float() — BusinessValueCalculator returns Decimal,
+        # which would break the JSON results_summary column)
         total_cost = sum(r.get('total_cost', 0) for r in successful)
-        total_business_value = sum(r.get('business_value', 0) for r in successful)
+        total_business_value = float(sum(r.get('business_value', 0) for r in successful))
 
         # Calculate ROI
         roi = self.business_calculator.calculate_roi(

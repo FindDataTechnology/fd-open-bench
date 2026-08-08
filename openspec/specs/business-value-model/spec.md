@@ -48,15 +48,15 @@ The system SHALL compute total_cost = token_cost + time_cost + infrastructure_co
 - **THEN** the system SHALL compute total_cost = $0.095 and cost_breakdown = {token: 15.8%, time: 52.6%, infrastructure: 31.6%}
 
 ### Requirement: System calculates business value delivered
-The system SHALL calculate business_value delivered by each evaluation result. Business value SHALL be computed from the Golden's business_value field (if provided) multiplied by a success_factor (0.0 to 1.0 based on evaluation scores). Alternatively, business value SHALL be computable via a custom formula configured per agent (e.g., value = task_completion_score × deal_value).
+系统 SHALL 基于 Benchmark 上的 value_formula 计算商业价值,公式通过安全表达式求值器执行,禁止 `eval()`。允许变量: business_value、success_score、human_cost、latency_s、input_tokens、output_tokens;允许白名单函数: min、max、abs、round。求值失败时 SHALL 回退到默认公式 `business_value * success_score` 并在结果 metadata 记录 `formula_error`。
 
-#### Scenario: Business value from Golden
-- **WHEN** a Golden has business_value=50.0 and the evaluation result has overall_score=0.8
-- **THEN** the system SHALL compute business_value_delivered = 50.0 × 0.8 = $40.0
+#### Scenario: 自定义公式求值
+- **WHEN** Benchmark 的 value_formula 为 `business_value * success_score - time_cost`
+- **THEN** 系统使用安全求值器计算,结果正确反映公式语义
 
-#### Scenario: Custom value formula
-- **WHEN** an agent has value_formula="task_completion_score × deal_value" and the evaluation result has task_completion_score=0.9 and deal_value=100.0 (from Golden metadata)
-- **THEN** the system SHALL compute business_value_delivered = 0.9 × 100.0 = $90.0
+#### Scenario: 恶意公式被拒绝
+- **WHEN** value_formula 包含属性访问、import 或任意函数调用(如 `__class__.__bases__`)
+- **THEN** 求值器拒绝执行,回退默认公式,metadata 记录 formula_error
 
 ### Requirement: System computes ROI (Return on Investment)
 The system SHALL compute ROI for each evaluation result and aggregate ROI across evaluation runs. ROI SHALL be computed as: roi = (business_value_delivered - total_cost) / total_cost. The system SHALL also compute: cost_efficiency = business_value_delivered / total_cost, break_even_point = total_cost / business_value_per_task, and marginal_cost = cost of next additional task.
@@ -69,16 +69,34 @@ The system SHALL compute ROI for each evaluation result and aggregate ROI across
 - **WHEN** an evaluation run has 100 test cases with total business_value_delivered=$2000 and total_cost=$9.50
 - **THEN** the system SHALL compute aggregate_roi = (2000 - 9.50) / 9.50 = 209.53
 
-### Requirement: System compares token spend vs time-based cost
-The system SHALL provide comparison views showing token_cost vs time_cost for each evaluation result and aggregated across runs. The system SHALL highlight which cost component dominates. The system SHALL support "what-if" analysis: "If we switch from per-minute to token-based pricing, how does cost change?"
+### Requirement: 每成功任务成本
+系统 SHALL 计算 cost_per_success = 总成本 / 成功任务数,作为商业层核心指标。
 
-#### Scenario: Cost comparison view
-- **WHEN** an evaluation result has token_cost=$0.015 and time_cost=$0.05
-- **THEN** the system SHALL display a comparison showing time_cost is 3.33× higher than token_cost, and time_cost represents 76.9% of total cost
+#### Scenario: 正常计算
+- **WHEN** 某 agent 在 benchmark 下总成本 $12、成功 8 题
+- **THEN** cost_per_success = $1.50
 
-#### Scenario: What-if pricing analysis
-- **WHEN** a user requests "what-if" analysis switching from per-minute ($0.10/min) to token-based pricing for an agent with average execution_time=5 minutes and average token_usage=2000 tokens
-- **THEN** the system SHALL compute current_cost = 5 × $0.10 = $0.50, alternative_cost = token_cost_at_2000_tokens, and show the difference
+#### Scenario: 零成功保护
+- **WHEN** 成功数为 0
+- **THEN** cost_per_success 为 null(不除零、不显示 0)
+
+### Requirement: 人工替代率
+系统 SHALL 在 golden 提供 human_cost 时,计算 human_replacement = agent 每成功任务成本 / 人工每任务成本;缺数据的样本 SHALL 跳过并报告计数。
+
+#### Scenario: 计算替代率
+- **WHEN** agent 每成功任务成本 $1.50,golden 平均 human_cost $30
+- **THEN** human_replacement = 0.05(即人工成本的 5%)
+
+#### Scenario: 部分缺数据
+- **WHEN** 10 题中 4 题无 human_cost
+- **THEN** 替代率基于 6 题计算,并标注 "4/10 题缺人工成本数据"
+
+### Requirement: 时间价值成本
+系统 SHALL 按 Benchmark 的 time_value_rate($/秒)将总延迟折算为 time_cost,并从商业价值净额中扣除。
+
+#### Scenario: 时间成本计入
+- **WHEN** time_value_rate = $0.10/秒,某 run 总延迟 300 秒
+- **THEN** time_cost = $30,商业净额 = 总价值 - 总成本 - time_cost
 
 ### Requirement: System tracks cost trends over time
 The system SHALL track cost trends across evaluation runs for each agent. The system SHALL compute: average_cost_per_run, cost_per_task_completion (total_cost / number of successful tasks), cost_trend (percentage change in average cost over time), and cost_forecast (predicted cost for next N runs based on trend).

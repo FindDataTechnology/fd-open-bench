@@ -71,6 +71,16 @@ async def create_batch(
             detail=f"Agents not found: {missing}"
         )
 
+    # Default the evaluators from the benchmark's metric suite when the caller
+    # doesn't pin explicit configs (matches what the UI's "Run New Batch" sends).
+    # ponytail: one deterministic scorer per metric — swap in LLM judges via
+    # evaluator_configs for deeper metrics.
+    if not batch_data.evaluator_configs:
+        batch_data.evaluator_configs = [
+            {"type": "similarity", "name": metric}
+            for metric in benchmark.metric_suite or []
+        ]
+
     # Create batch ID
     batch_id = str(uuid.uuid4())
 
@@ -98,14 +108,11 @@ async def create_batch(
 
     db.commit()
 
-    # Start background tasks for each agent (with semaphore)
-    batch_service = BatchEvaluationService(db)
+    # Start background tasks for each agent (with semaphore). Each run gets its
+    # own Session — the request one is closed after this response, and sharing
+    # one Session across concurrent runs would interleave their commits.
     for run in runs:
-        background_tasks.add_task(
-            run_agent_evaluation,
-            batch_service,
-            run.id
-        )
+        background_tasks.add_task(run_agent_evaluation, run.id)
 
     return BatchResponse(
         batch_id=batch_id,
@@ -138,13 +145,17 @@ async def get_batch_status(
         )
 
 
-async def run_agent_evaluation(batch_service: BatchEvaluationService, run_id: str):
+async def run_agent_evaluation(run_id: str):
     """Run evaluation for a single agent (with semaphore)."""
     async with batch_semaphore:
+        # Fresh Session per run; close it when done.
+        from app.database import SessionLocal
+        db = SessionLocal()
         try:
-            # Execute the batch evaluation
-            await batch_service.execute_batch_evaluation(run_id)
+            service = BatchEvaluationService(db)
+            await service.execute_batch_evaluation(run_id)
         except Exception as e:
+            db.rollback()
             logger.error(f"Failed to execute evaluation for run {run_id}: {e}")
-            # Update run status to failed
-            # Note: This would need proper error handling in production
+        finally:
+            db.close()

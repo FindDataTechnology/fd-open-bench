@@ -4,11 +4,14 @@ set -e
 
 echo "Starting fd-open-bench development environment..."
 
-# Load environment variables from .env
+# Load only the vars start.sh itself needs. We deliberately do NOT `source
+# .env`: bash strips quotes, which corrupts JSON array values (CORS_ORIGINS)
+# that pydantic-settings expects. The backend reads .env directly.
 if [ -f .env ]; then
-    set -a
-    source .env
-    set +a
+    export FASTAPI_PORT="$(grep -E '^FASTAPI_PORT=' .env | head -1 | cut -d= -f2- | tr -d '\"')"
+    export FRONTEND_PORT="$(grep -E '^FRONTEND_PORT=' .env | head -1 | cut -d= -f2- | tr -d '\"')"
+    export API_URL="$(grep -E '^API_URL=' .env | head -1 | cut -d= -f2- | tr -d '\"')"
+    : "${FASTAPI_PORT:=8999}" "${FRONTEND_PORT:=3118}" "${API_URL:=http://localhost:8999}"
 else
     echo "No .env file found. Creating from .env.example..."
     cp .env.example .env

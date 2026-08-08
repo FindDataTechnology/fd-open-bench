@@ -122,8 +122,7 @@ async def create_evaluation(
             created_by=eval_data.created_by
         )
 
-        # Start execution in background
-        # In production, this would be a Celery task
+        # Start execution in background (asyncio task, same process)
         import asyncio
         asyncio.create_task(service.execute_batch_evaluation(run_id))
 

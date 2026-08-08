@@ -227,5 +227,65 @@ class FormatValidator:
             execution_time_ms=elapsed,
         )
 
+
+class SimilarityValidator:
+    """Token-overlap (F1) similarity vs the golden's expected_output.
+
+    Used as the default deterministic scorer for metric_suite entries when
+    no evaluator_configs are supplied at batch time. It needs no LLM keys,
+    so the full pipeline (benchmark → batch → leaderboard) works from a
+    fresh install. Score is F1 in [0, 1]; `passed` when score >= threshold.
+    """
+
+    type = "validator"
+    description = "Token-overlap (F1) similarity vs expected output"
+
+    def __init__(self, name: str, threshold: float = 0.5):
+        self.name = name
+        self.threshold = threshold
+
+    @staticmethod
+    def _tokenize(text: str) -> list[str]:
+        return re.findall(r"\w+", text.lower())
+
+    async def evaluate(self, context: EvaluationContext) -> EvaluatorResult:
+        start = time.perf_counter()
+        expected = context.expected_output
+        if not expected:
+            elapsed = (time.perf_counter() - start) * 1000
+            return EvaluatorResult(
+                score=0.0,
+                passed=False,
+                reason="No expected_output to compare against",
+                execution_time_ms=elapsed,
+            )
+
+        ref = self._tokenize(expected)
+        hyp = self._tokenize(context.output or "")
+        if not ref or not hyp:
+            score = 0.0
+        else:
+            ref_set = set(ref)
+            hyp_set = set(hyp)
+            common = ref_set & hyp_set
+            if not common:
+                score = 0.0
+            else:
+                precision = len(common) / len(hyp_set)
+                recall = len(common) / len(ref_set)
+                score = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
+
+        elapsed = (time.perf_counter() - start) * 1000
+        passed = score >= self.threshold
+        return EvaluatorResult(
+            score=score,
+            passed=passed,
+            reason=f"F1={score:.3f} (threshold={self.threshold})",
+            execution_time_ms=elapsed,
+        )
+
+    def validate_config(self, config: dict[str, Any]) -> bool:
+        return True
+
     def validate_config(self, config: dict[str, Any]) -> bool:
         return "format" in config

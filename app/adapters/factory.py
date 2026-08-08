@@ -27,6 +27,10 @@ def build_adapter(agent) -> object:
         from app.adapters.langchain_adapter import LangChainAgentAdapter
         return LangChainAgentAdapter(agent=cfg.pop("agent", None), **cfg)
 
+    if t == "echo":
+        from app.adapters.echo_adapter import EchoAgentAdapter
+        return EchoAgentAdapter(**cfg)
+
     # custom: import wrapper class by dotted path
     mod, _, cls = cfg["class"].rpartition(":")
     return getattr(importlib.import_module(mod), cls)(**cfg.get("kwargs", {}))

@@ -153,7 +153,16 @@ class ComparisonService:
 
         # Calculate aggregate metrics
         total_cost = sum(costs) if costs else 0.0
-        total_business_value = sum(business_values) if business_values else 0.0
+        # Prefer the per-task value the engine already computed from the
+        # benchmark's value formula; fall back to raw golden business_value
+        # for runs from before formulas were wired into the engine.
+        delivered = [
+            float(r.business_value_delivered)
+            for r in all_results
+            if r.business_value_delivered is not None
+        ]
+        total_business_value = (sum(delivered) if delivered
+                                else (sum(business_values) if business_values else 0.0))
 
         # Success criteria: status is SUCCESS and has metric scores
         success_count = len([r for r in all_results if r.status.value == "success" and r.metric_scores])

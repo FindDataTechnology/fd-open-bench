@@ -61,7 +61,7 @@
 
 ## 阶段 5 — 收尾
 
-- [ ] 5.1 全仓 grep 确认无残留引用: celery、redis、`app.api.agents`(旧)、eval(
-- [ ] 5.2 `add-e2e-tests` 重启评估: 按新页面结构修订其 tasks.md(或关闭并另起 change)
-- [ ] 5.3 最终回归: 从空库起步,README Quick Start 逐步执行至看到 Leaderboard
-- [ ] 5.4 archive 本 change
+- [x] 5.1 全仓 grep 确认无残留引用: celery、redis、`app.api.agents`(旧)、eval(
+- [x] 5.2 `add-e2e-tests` 重启评估: 按新页面结构修订其 tasks.md(或关闭并另起 change)
+- [x] 5.3 最终回归: 从空库起步,README Quick Start 逐步执行至看到 Leaderboard(发现并修复: results_summary Decimal 不可 JSON 序列化;start.sh `source .env` 破坏 JSON 数组;并新增 echo 适配器/默认 similarity 打分器打通无密钥全流程)
+- [x] 5.4 archive 本 change(delta specs 已 sync 到 main specs)

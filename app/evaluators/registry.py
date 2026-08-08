@@ -7,6 +7,7 @@ from app.evaluators.validators import (
     LengthValidator,
     ContainsValidator,
     FormatValidator,
+    SimilarityValidator,
 )
 from app.evaluators.llm_judges import (
     DeepEvalMetricWrapper,
@@ -79,6 +80,11 @@ class EvaluatorRegistry:
             return FormatValidator(
                 name=name,
                 format_type=config["format"],
+            )
+        elif eval_type == "similarity":
+            return SimilarityValidator(
+                name=name,
+                threshold=config.get("threshold", 0.5),
             )
         elif eval_type == "deepeval_metric":
             return DeepEvalMetricWrapper(

@@ -70,7 +70,9 @@ fd-bench report <run_id> --format markdown
 An AI system you want to evaluate: a customer-support bot, a coding assistant,
 etc. Each agent has:
 
-- **Adapter type**: how it executes (OpenAI-compatible, HTTP, custom)
+- **Adapter type**: how it executes (OpenAI-compatible, HTTP, custom, or
+  built-in `echo` — a deterministic fake agent for smoke tests / demo runs
+  with no API key needed)
 - **Configuration**: model settings, tools, prompts
 - **Pricing config**: token/time costs used for business metrics
 
@@ -253,6 +255,11 @@ roi               = net_value / (total_cost + time_cost)
 - `total_business_value` sums the benchmark's **value formula** evaluated per
   golden (formula errors fall back to `business_value * success_score` and are
   recorded in metadata as `formula_error`).
+- When no custom evaluators are pinned on a batch, each metric in the
+  benchmark's suite is scored with a built-in deterministic **similarity**
+  scorer (token-overlap F1 vs the golden's `expected_output`) — so the whole
+  loop runs without LLM keys. Swap in LLM judges via `evaluator_configs`
+  for deeper metrics.
 - Goldens missing `human_cost` are skipped from the human-cost average and
   counted — a missing average yields a null `human_replacement`, not zero.
 - The `export_report` MCP tool / `fd-bench report` includes a **Business
