@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "fd-open-bench": {
+      "command": "fd-bench",
+      "args": ["mcp", "serve"],
+      "env": {
+        "FD_BENCH_API_URL": "http://localhost:8999",
+        "ANTHROPIC_API_KEY": "sk-your-key-here",
+        "ANTHROPIC_BASE_URL": "https://your-llm-endpoint/v1"
+      }
+    }
+  }
+}

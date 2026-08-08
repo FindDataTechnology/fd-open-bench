@@ -1,0 +1,107 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: fd-open-bench-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/fd_open_bench
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    networks:
+      - fd-open-bench-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fd-open-bench-frontend
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    networks:
+      - fd-open-bench-network
+
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    container_name: fd-open-bench-celery
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/fd_open_bench
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    command: celery -A app.celery_worker worker --loglevel=info
+    restart: unless-stopped
+    networks:
+      - fd-open-bench-network
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    container_name: fd-open-bench-celery-beat
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/fd_open_bench
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    command: celery -A app.celery_worker beat --loglevel=info
+    restart: unless-stopped
+    networks:
+      - fd-open-bench-network
+
+  db:
+    image: postgres:16-alpine
+    container_name: fd-open-bench-db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=fd_open_bench
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - fd-open-bench-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: fd-open-bench-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - fd-open-bench-network
+
+networks:
+  fd-open-bench-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
