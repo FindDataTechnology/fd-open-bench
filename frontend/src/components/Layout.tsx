@@ -10,12 +10,10 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
 
   const navigation = [
-    { name: 'Dashboard', href: '/', icon: '📊' },
+    { name: 'Leaderboard', href: '/', icon: '🏆' },
+    { name: 'Benchmarks', href: '/benchmarks', icon: '📊' },
     { name: 'Agents', href: '/agents', icon: '🤖' },
     { name: 'Datasets', href: '/datasets', icon: '📁' },
-    { name: 'Evaluations', href: '/evaluations', icon: '🧪' },
-    { name: 'Evaluators', href: '/evaluators', icon: '⚖️' },
-    { name: 'Cost Analyzer', href: '/cost-analyzer', icon: '💰' },
     { name: 'Settings', href: '/settings', icon: '⚙️' },
   ]
 

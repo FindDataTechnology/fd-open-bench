@@ -100,6 +100,12 @@ export default function DatasetDetail() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Business Value
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  Human Cost
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  Human Time
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -115,7 +121,13 @@ export default function DatasetDetail() {
                     {golden.expected_output || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    ${golden.business_value?.toFixed(2) || '0.00'}
+                    {golden.business_value !== null ? `$${golden.business_value.toFixed(2)}` : '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    {golden.human_cost !== null ? `$${golden.human_cost.toFixed(2)}` : '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    {golden.human_minutes !== null ? `${golden.human_minutes} min` : '-'}
                   </td>
                 </tr>
               ))}

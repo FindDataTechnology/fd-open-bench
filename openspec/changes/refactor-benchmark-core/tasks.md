@@ -35,18 +35,18 @@
 - [x] 2.7 新增 `app/services/comparison.py`: 输入 benchmark_id(可选 batch_id),聚合该 benchmark 下 runs,输出每 agent 的技术统计(avg/n/stddev/min/max per metric)+ 商业指标(2.2-2.4)
 - [x] 2.8 `GET /api/v1/benchmarks/{id}/leaderboard`: 调用 comparison service,默认按 cost_per_success 升序;无数据 agent 列末尾并标注
 - [x] 2.9 引擎层单元测试: 统计口径正确(手算小样本对照)、跨 benchmark 数据不混入、缺字段样本跳过逻辑
-- [ ] 2.10 提交阶段 2,验证: 构造 2 agents × 1 benchmark 的批量跑,leaderboard API 返回正确排序与统计
+- [x] 2.10 提交阶段 2,验证: 构造 2 agents × 1 benchmark 的批量跑,leaderboard API 返回正确排序与统计
 
 ## 阶段 3 — Leaderboard UI
 
-- [ ] 3.1 新建 Leaderboard 页面为首页 `/`: benchmark 选择器 + 对比表格(技术列: 各指标 avg±stddev;商业列: 每成功任务成本/ROI/人工替代率/时间成本)
-- [ ] 3.2 表格支持排序切换(按任意列)、点击 agent 行钻取到该 batch 的 run 详情
-- [ ] 3.3 新建 Benchmarks 列表/创建页 `/benchmarks`: 选 dataset、勾选指标套件、填 value_formula(带语法校验提示)与 time_value_rate
-- [ ] 3.4 Benchmark 详情页: 题目列表(含商业字段)、历史 batch 列表、"运行新批量"入口(选 agents → POST /batches)
-- [ ] 3.5 改造 EvaluationDetail 为 batch 详情 `/runs/:batchId`: 多 agent 进度、逐 golden 结果、trace 查看保留
-- [ ] 3.6 Golden 编辑/导入界面支持 business_value/human_cost/human_minutes
-- [ ] 3.7 删除 Dashboard、独立 CostAnalyzer、Evaluators 独立页及其路由;Layout 导航收敛为 Leaderboard/Benchmarks/Agents/Settings
-- [ ] 3.8 商业列空态处理: 无 human_cost 数据时显示"补全人工成本数据后可用"而非 0 或报错
+- [x] 3.1 新建 Leaderboard 页面为首页 `/`: benchmark 选择器 + 对比表格(技术列: 各指标 avg±stddev;商业列: 每成功任务成本/ROI/人工替代率/时间成本)
+- [x] 3.2 表格支持排序切换(按任意列)、点击 agent 行钻取到该 batch 的 run 详情
+- [x] 3.3 新建 Benchmarks 列表/创建页 `/benchmarks`: 选 dataset、勾选指标套件、填 value_formula(带语法校验提示)与 time_value_rate
+- [x] 3.4 Benchmark 详情页: 题目列表(含商业字段)、历史 batch 列表、"运行新批量"入口(选 agents → POST /batches)
+- [x] 3.5 改造 EvaluationDetail 为 batch 详情 `/runs/:batchId`: 多 agent 进度、逐 golden 结果、trace 查看保留
+- [x] 3.6 Golden 编辑/导入界面支持 business_value/human_cost/human_minutes
+- [x] 3.7 删除 Dashboard、独立 CostAnalyzer、Evaluators 独立页及其路由;Layout 导航收敛为 Leaderboard/Benchmarks/Agents/Settings
+- [x] 3.8 商业列空态处理: 无 human_cost 数据时显示"补全人工成本数据后可用"而非 0 或报错
 - [ ] 3.9 提交阶段 3,验证: 前端构建通过;完整走通"建 benchmark → 跑批量 → 看榜 → 钻取详情"
 
 ## 阶段 4 — MCP/CLI 同步
