@@ -12,6 +12,7 @@ node_modules/
 dist/
 
 # Env & data
+.mcp.json
 .env
 *.db
 *.db-wal
